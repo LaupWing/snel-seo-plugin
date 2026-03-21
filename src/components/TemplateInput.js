@@ -77,14 +77,6 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, pre
                 ) ) }
             </div>
 
-            {/* Preview */}
-            { preview && (
-                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-400 mb-1">{ __( 'Preview:', 'snel-seo' ) }</p>
-                    <p className="text-sm font-medium text-blue-700">{ preview }</p>
-                </div>
-            ) }
-
             {/* Character count */}
             { maxLength > 0 && value && (
                 <p className={ `mt-1 text-xs ${ value.length > maxLength ? 'text-red-500' : 'text-gray-400' }` }>

@@ -2,6 +2,7 @@ import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Globe, Home, FileText, PenTool, Save } from 'lucide-react';
 import TemplateInput from '../components/TemplateInput';
+import GooglePreview from '../components/GooglePreview';
 
 const SEPARATORS = [
     { label: '–', value: 'sc-dash' },
@@ -171,7 +172,6 @@ export default function Settings() {
                             value={ settings.title_home }
                             onChange={ ( v ) => update( 'title_home', v ) }
                             badgeGroup="homepage"
-                            preview={ resolveTemplate( settings.title_home || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
                         />
                         <TemplateInput
                             label={ __( 'Meta Description', 'snel-seo' ) }
@@ -179,6 +179,11 @@ export default function Settings() {
                             onChange={ ( v ) => update( 'metadesc_home', v ) }
                             badgeGroup="homepage"
                             maxLength={ 160 }
+                        />
+                        <GooglePreview
+                            title={ resolveTemplate( settings.title_home || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
+                            url={ window.snelSeo?.siteUrl }
+                            description={ settings.metadesc_home }
                         />
                     </div>
                 ) }
@@ -190,7 +195,6 @@ export default function Settings() {
                             value={ settings.title_page }
                             onChange={ ( v ) => update( 'title_page', v ) }
                             badgeGroup="page"
-                            preview={ resolveTemplate( settings.title_page || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                         />
                         <TemplateInput
                             label={ __( 'Default Meta Description', 'snel-seo' ) }
@@ -198,6 +202,11 @@ export default function Settings() {
                             onChange={ ( v ) => update( 'metadesc_page', v ) }
                             badgeGroup="page"
                             maxLength={ 160 }
+                        />
+                        <GooglePreview
+                            title={ resolveTemplate( settings.title_page || '%%title%% %%separator%% %%sitename%%', previewVars ) }
+                            url={ window.snelSeo?.siteUrl + '/example-page/' }
+                            description={ settings.metadesc_page }
                         />
                     </div>
                 ) }
@@ -209,7 +218,6 @@ export default function Settings() {
                             value={ settings.title_post }
                             onChange={ ( v ) => update( 'title_post', v ) }
                             badgeGroup="post"
-                            preview={ resolveTemplate( settings.title_post || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                         />
                         <TemplateInput
                             label={ __( 'Default Meta Description', 'snel-seo' ) }
@@ -217,6 +225,11 @@ export default function Settings() {
                             onChange={ ( v ) => update( 'metadesc_post', v ) }
                             badgeGroup="post"
                             maxLength={ 160 }
+                        />
+                        <GooglePreview
+                            title={ resolveTemplate( settings.title_post || '%%title%% %%separator%% %%sitename%%', previewVars ) }
+                            url={ window.snelSeo?.siteUrl + '/example-post/' }
+                            description={ settings.metadesc_post }
                         />
                     </div>
                 ) }
