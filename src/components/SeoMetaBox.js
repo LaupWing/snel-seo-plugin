@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { Search, Share2, Settings, Sparkles, Languages, Check, Loader2 } from 'lucide-react';
+import { Search, Share2, Settings, Sparkles, Languages } from 'lucide-react';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
@@ -16,8 +16,8 @@ export default function SeoMetaBox() {
     const [ generatingTitle, setGeneratingTitle ] = useState( false );
     const [ generatingDesc, setGeneratingDesc ] = useState( false );
     const [ translatingAll, setTranslatingAll ] = useState( false );
-    // { langCode: 'translating' | 'done' | 'skipped' }
-    const [ translationProgress, setTranslationProgress ] = useState( {} );
+    const [ btnText, setBtnText ] = useState( null );
+    const [ btnAnimStyle, setBtnAnimStyle ] = useState( {} );
 
     const isMultilingual = window.snelSeoEditor?.multilingual || false;
     const languages = window.snelSeoEditor?.languages || [];
@@ -89,11 +89,27 @@ export default function SeoMetaBox() {
         setLoading( false );
     };
 
+    // Slide animation for Translate All button text
+    const animateBtnText = ( text ) => {
+        return new Promise( ( resolve ) => {
+            setBtnAnimStyle( { transform: 'translateY(-100%)', opacity: 0, transition: 'all 0.2s ease-in' } );
+            setTimeout( () => {
+                setBtnText( text );
+                setBtnAnimStyle( { transform: 'translateY(100%)', opacity: 0, transition: 'none' } );
+                requestAnimationFrame( () => {
+                    requestAnimationFrame( () => {
+                        setBtnAnimStyle( { transform: 'translateY(0)', opacity: 1, transition: 'all 0.25s ease-out' } );
+                        setTimeout( resolve, 250 );
+                    } );
+                } );
+            }, 200 );
+        } );
+    };
+
     // Translate All — generate title + description for all non-default languages
     const handleTranslateAll = async () => {
         if ( ! postId ) return;
         setTranslatingAll( true );
-        setTranslationProgress( {} );
 
         const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
 
@@ -101,12 +117,9 @@ export default function SeoMetaBox() {
             const needsTitle = seoTitle[ defaultLang ] && ! seoTitle[ lang.code ];
             const needsDesc = metaDesc[ defaultLang ] && ! metaDesc[ lang.code ];
 
-            if ( ! needsTitle && ! needsDesc ) {
-                setTranslationProgress( ( prev ) => ( { ...prev, [ lang.code ]: 'skipped' } ) );
-                continue;
-            }
+            if ( ! needsTitle && ! needsDesc ) continue;
 
-            setTranslationProgress( ( prev ) => ( { ...prev, [ lang.code ]: 'translating' } ) );
+            await animateBtnText( `✦ Translating ${ lang.label }...` );
 
             if ( needsTitle ) {
                 try {
@@ -136,14 +149,16 @@ export default function SeoMetaBox() {
                 } catch {}
             }
 
-            setTranslationProgress( ( prev ) => ( { ...prev, [ lang.code ]: 'done' } ) );
+            await animateBtnText( `${ lang.label } ✓` );
+            await new Promise( ( r ) => setTimeout( r, 500 ) );
         }
 
-        // Keep progress visible for a moment so user sees the checkmarks.
-        setTimeout( () => {
-            setTranslatingAll( false );
-            setTranslationProgress( {} );
-        }, 2000 );
+        await animateBtnText( 'All done ✓' );
+        await new Promise( ( r ) => setTimeout( r, 1200 ) );
+
+        setBtnText( null );
+        setBtnAnimStyle( {} );
+        setTranslatingAll( false );
     };
 
     // Count how many languages are missing content
@@ -223,42 +238,25 @@ export default function SeoMetaBox() {
                                     type="button"
                                     onClick={ handleTranslateAll }
                                     disabled={ translatingAll || missingCount === 0 || ! hasDefaultContent }
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="min-w-[140px] h-[28px] px-3 py-1 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-full overflow-hidden inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <Languages size={ 12 } className={ translatingAll ? 'animate-spin' : '' } />
-                                    { translatingAll
-                                        ? __( 'Translating...', 'snel-seo' )
-                                        : missingCount > 0
-                                            ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
-                                            : __( 'All translated', 'snel-seo' )
-                                    }
+                                    { btnText ? (
+                                        <span className={ `inline-block ${ btnText.includes( '...' ) ? 'animate-pulse' : '' }` } style={ btnAnimStyle }>
+                                            { btnText }
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <Languages size={ 12 } />
+                                            { missingCount > 0
+                                                ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
+                                                : __( 'All translated', 'snel-seo' )
+                                            }
+                                        </span>
+                                    ) }
                                 </button>
                             </span>
                         </Tooltip>
                     </div>
-
-                    { translatingAll && Object.keys( translationProgress ).length > 0 && (
-                        <div className="flex flex-wrap gap-2 py-2">
-                            { languages.filter( ( l ) => l.code !== defaultLang ).map( ( lang ) => {
-                                const status = translationProgress[ lang.code ];
-                                return (
-                                    <div
-                                        key={ lang.code }
-                                        className={ `flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all duration-300 ${
-                                            status === 'done' ? 'bg-emerald-50 text-emerald-600'
-                                            : status === 'translating' ? 'bg-blue-50 text-blue-600'
-                                            : status === 'skipped' ? 'bg-gray-50 text-gray-400'
-                                            : 'bg-gray-50 text-gray-300'
-                                        }` }
-                                    >
-                                        { status === 'done' && <Check size={ 10 } /> }
-                                        { status === 'translating' && <Loader2 size={ 10 } className="animate-spin" /> }
-                                        { lang.label }
-                                    </div>
-                                );
-                            } ) }
-                        </div>
-                    ) }
                 </>
             ) }
 
