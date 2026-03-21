@@ -289,6 +289,7 @@ export default function SeoMetaBox() {
                         value={ currentTitle }
                         onChange={ updateTitle }
                         badgeGroup="page"
+                        placeholder={ `${ postTitle } ${ sepChar } ${ siteName }` }
                         action={
                             <Tooltip text={ generatingTitle ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) } delay={ 100 }>
                                 <button
@@ -309,6 +310,7 @@ export default function SeoMetaBox() {
                         onChange={ updateDesc }
                         badgeGroup="page"
                         maxLength={ 160 }
+                        placeholder={ __( 'Click ✦ to generate from page content, or type manually...', 'snel-seo' ) }
                         action={
                             <Tooltip text={ generatingDesc ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) } delay={ 100 }>
                                 <button

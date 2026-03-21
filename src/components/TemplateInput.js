@@ -22,7 +22,7 @@ const BADGE_GROUPS = {
     ],
 };
 
-export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action } ) {
+export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action, placeholder } ) {
     const inputRef = useRef( null );
     const badges = BADGE_GROUPS[ badgeGroup ] || BADGE_GROUPS.page;
 
@@ -79,6 +79,7 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, max
                 value={ value || '' }
                 onChange={ ( e ) => onChange( e.target.value ) }
                 onKeyDown={ ( e ) => e.stopPropagation() }
+                placeholder={ placeholder || '' }
                 rows={ isTextarea ? 3 : undefined }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6] resize-none"
             />

@@ -593,10 +593,15 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     $title   = $post->post_title;
 
 
+    $settings  = get_option( 'wpseo_titles', array() );
+    $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
+    $separator = snel_seo_get_separator();
+
     if ( 'title' === $type ) {
         $prompt = "Generate an SEO-optimized title in {$lang_name} for the following page. "
-                . "Keep it under 60 characters. Make it compelling and click-worthy. "
-                . "Write in {$lang_name}. Return ONLY the title, nothing else.\n\n"
+                . "The format should be: [compelling page title] {$separator} {$site_name}. "
+                . "The total length must be under 60 characters including the separator and site name. "
+                . "Write in {$lang_name}. Return ONLY the full title with separator and site name, nothing else.\n\n"
                 . "Page title: {$title}\n"
                 . "Page content: {$content}";
     } else {
