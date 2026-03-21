@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Globe, Home, FileText, PenTool, Save } from 'lucide-react';
+import TemplateInput from '../components/TemplateInput';
 
 const SEPARATORS = [
     { label: '–', value: 'sc-dash' },
@@ -165,111 +166,58 @@ export default function Settings() {
 
                 { activeTab === 'homepage' && (
                     <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'SEO Title', 'snel-seo' ) }
-                            </label>
-                            <input
-                                type="text"
-                                value={ settings.title_home || '' }
-                                onChange={ ( e ) => update( 'title_home', e.target.value ) }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Variables: %%sitename%%, %%sitedesc%%, %%separator%%', 'snel-seo' ) }
-                            </p>
-                            <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                <p className="text-xs text-gray-400 mb-1">{ __( 'Preview:', 'snel-seo' ) }</p>
-                                <p className="text-sm font-medium text-blue-700">
-                                    { resolveTemplate( settings.title_home || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
-                                </p>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'Meta Description', 'snel-seo' ) }
-                            </label>
-                            <textarea
-                                value={ settings.metadesc_home || '' }
-                                onChange={ ( e ) => update( 'metadesc_home', e.target.value ) }
-                                rows={ 3 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                            />
-                            { settings.metadesc_home && (
-                                <p className={ `mt-1 text-xs ${ settings.metadesc_home.length > 160 ? 'text-red-500' : 'text-gray-400' }` }>
-                                    { settings.metadesc_home.length } / 160 { __( 'characters', 'snel-seo' ) }
-                                </p>
-                            ) }
-                        </div>
+                        <TemplateInput
+                            label={ __( 'SEO Title', 'snel-seo' ) }
+                            value={ settings.title_home }
+                            onChange={ ( v ) => update( 'title_home', v ) }
+                            badgeGroup="homepage"
+                            preview={ resolveTemplate( settings.title_home || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
+                        />
+                        <TemplateInput
+                            label={ __( 'Meta Description', 'snel-seo' ) }
+                            value={ settings.metadesc_home }
+                            onChange={ ( v ) => update( 'metadesc_home', v ) }
+                            badgeGroup="homepage"
+                            maxLength={ 160 }
+                        />
                     </div>
                 ) }
 
                 { activeTab === 'pages' && (
                     <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'SEO Title Template', 'snel-seo' ) }
-                            </label>
-                            <input
-                                type="text"
-                                value={ settings.title_page || '' }
-                                onChange={ ( e ) => update( 'title_page', e.target.value ) }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Variables: %%title%%, %%sitename%%, %%separator%%', 'snel-seo' ) }
-                            </p>
-                            <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                                <p className="text-xs text-gray-400 mb-1">{ __( 'Preview:', 'snel-seo' ) }</p>
-                                <p className="text-sm font-medium text-blue-700">
-                                    { resolveTemplate( settings.title_page || '%%title%% %%separator%% %%sitename%%', previewVars ) }
-                                </p>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'Default Meta Description', 'snel-seo' ) }
-                            </label>
-                            <textarea
-                                value={ settings.metadesc_page || '' }
-                                onChange={ ( e ) => update( 'metadesc_page', e.target.value ) }
-                                rows={ 3 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                            />
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Used when a page has no custom meta description.', 'snel-seo' ) }
-                            </p>
-                        </div>
+                        <TemplateInput
+                            label={ __( 'SEO Title Template', 'snel-seo' ) }
+                            value={ settings.title_page }
+                            onChange={ ( v ) => update( 'title_page', v ) }
+                            badgeGroup="page"
+                            preview={ resolveTemplate( settings.title_page || '%%title%% %%separator%% %%sitename%%', previewVars ) }
+                        />
+                        <TemplateInput
+                            label={ __( 'Default Meta Description', 'snel-seo' ) }
+                            value={ settings.metadesc_page }
+                            onChange={ ( v ) => update( 'metadesc_page', v ) }
+                            badgeGroup="page"
+                            maxLength={ 160 }
+                        />
                     </div>
                 ) }
 
                 { activeTab === 'posts' && (
                     <div className="space-y-6">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'SEO Title Template', 'snel-seo' ) }
-                            </label>
-                            <input
-                                type="text"
-                                value={ settings.title_post || '' }
-                                onChange={ ( e ) => update( 'title_post', e.target.value ) }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Variables: %%title%%, %%sitename%%, %%separator%%', 'snel-seo' ) }
-                            </p>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'Default Meta Description', 'snel-seo' ) }
-                            </label>
-                            <textarea
-                                value={ settings.metadesc_post || '' }
-                                onChange={ ( e ) => update( 'metadesc_post', e.target.value ) }
-                                rows={ 3 }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                            />
-                        </div>
+                        <TemplateInput
+                            label={ __( 'SEO Title Template', 'snel-seo' ) }
+                            value={ settings.title_post }
+                            onChange={ ( v ) => update( 'title_post', v ) }
+                            badgeGroup="post"
+                            preview={ resolveTemplate( settings.title_post || '%%title%% %%separator%% %%sitename%%', previewVars ) }
+                        />
+                        <TemplateInput
+                            label={ __( 'Default Meta Description', 'snel-seo' ) }
+                            value={ settings.metadesc_post }
+                            onChange={ ( v ) => update( 'metadesc_post', v ) }
+                            badgeGroup="post"
+                            maxLength={ 160 }
+                        />
                     </div>
                 ) }
             </div>
