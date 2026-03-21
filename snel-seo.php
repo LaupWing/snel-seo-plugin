@@ -183,3 +183,182 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
 
     return rest_ensure_response( array( 'success' => true ) );
 }
+
+// ─── Frontend Head Output ────────────────────────────────────────────────────
+
+/**
+ * Get the separator character from the stored value.
+ */
+function snel_seo_get_separator() {
+    $settings = get_option( 'wpseo_titles', array() );
+    $sep_key  = isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash';
+    $map      = array(
+        'sc-dash'   => '–',
+        'sc-hyphen' => '-',
+        'sc-pipe'   => '|',
+        'sc-middot' => '·',
+        'sc-bullet' => '•',
+        'sc-raquo'  => '»',
+        'sc-slash'  => '/',
+    );
+    return isset( $map[ $sep_key ] ) ? $map[ $sep_key ] : '–';
+}
+
+/**
+ * Resolve template variables in a title/description string.
+ */
+function snel_seo_resolve_template( $template, $vars = array() ) {
+    foreach ( $vars as $key => $value ) {
+        $template = str_replace( '%%' . $key . '%%', $value, $template );
+    }
+    return $template;
+}
+
+/**
+ * Get template variables for the current page context.
+ */
+function snel_seo_get_vars() {
+    $settings = get_option( 'wpseo_titles', array() );
+    return array(
+        'sitename'  => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
+        'sitedesc'  => get_bloginfo( 'description' ),
+        'separator' => snel_seo_get_separator(),
+        'title'     => wp_title( '', false ),
+        'category'  => single_cat_title( '', false ) ?: '',
+    );
+}
+
+/**
+ * Filter the document title.
+ */
+add_filter( 'pre_get_document_title', function ( $title ) {
+    $settings = get_option( 'wpseo_titles', array() );
+    $vars     = snel_seo_get_vars();
+
+    // Per-page override (Yoast-compatible post meta).
+    if ( is_singular() ) {
+        $post_id    = get_queried_object_id();
+        $custom     = get_post_meta( $post_id, '_yoast_wpseo_title', true );
+        if ( $custom ) {
+            return snel_seo_resolve_template( $custom, $vars );
+        }
+    }
+
+    // Homepage.
+    if ( is_front_page() || is_home() ) {
+        $template = isset( $settings['title-home-wpseo'] ) ? $settings['title-home-wpseo'] : '';
+        if ( $template ) {
+            return snel_seo_resolve_template( $template, $vars );
+        }
+    }
+
+    // Single post.
+    if ( is_singular( 'post' ) ) {
+        $template = isset( $settings['title-post'] ) ? $settings['title-post'] : '';
+        if ( $template ) {
+            $vars['title'] = get_the_title();
+            return snel_seo_resolve_template( $template, $vars );
+        }
+    }
+
+    // Page.
+    if ( is_page() ) {
+        $template = isset( $settings['title-page'] ) ? $settings['title-page'] : '';
+        if ( $template ) {
+            $vars['title'] = get_the_title();
+            return snel_seo_resolve_template( $template, $vars );
+        }
+    }
+
+    return $title;
+}, 15 );
+
+/**
+ * Output meta description, canonical, and Open Graph tags in <head>.
+ */
+add_action( 'wp_head', function () {
+    $settings = get_option( 'wpseo_titles', array() );
+    $vars     = snel_seo_get_vars();
+
+    // ── Meta Description ──
+    $description = '';
+
+    // Per-page override.
+    if ( is_singular() ) {
+        $post_id = get_queried_object_id();
+        $custom  = get_post_meta( $post_id, '_yoast_wpseo_metadesc', true );
+        if ( $custom ) {
+            $description = $custom;
+        }
+    }
+
+    // Fallback to template defaults.
+    if ( ! $description ) {
+        if ( is_front_page() || is_home() ) {
+            $description = isset( $settings['metadesc-home-wpseo'] ) ? $settings['metadesc-home-wpseo'] : '';
+        } elseif ( is_singular( 'post' ) ) {
+            $description = isset( $settings['metadesc-post'] ) ? $settings['metadesc-post'] : '';
+        } elseif ( is_page() ) {
+            $description = isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '';
+        }
+    }
+
+    if ( $description ) {
+        $description = snel_seo_resolve_template( $description, $vars );
+        printf( '<meta name="description" content="%s" />' . "\n", esc_attr( $description ) );
+    }
+
+    // ── Canonical URL ──
+    $canonical = '';
+    if ( is_singular() ) {
+        $custom_canonical = get_post_meta( get_queried_object_id(), '_yoast_wpseo_canonical', true );
+        $canonical = $custom_canonical ? $custom_canonical : get_permalink();
+    } elseif ( is_front_page() ) {
+        $canonical = home_url( '/' );
+    }
+
+    if ( $canonical ) {
+        printf( '<link rel="canonical" href="%s" />' . "\n", esc_url( $canonical ) );
+    }
+
+    // ── Open Graph ──
+    $og_title = '';
+    $og_desc  = '';
+    $og_image = '';
+    $og_url   = $canonical ?: home_url( '/' );
+
+    if ( is_singular() ) {
+        $post_id  = get_queried_object_id();
+        $og_title = get_post_meta( $post_id, '_yoast_wpseo_opengraph-title', true );
+        $og_desc  = get_post_meta( $post_id, '_yoast_wpseo_opengraph-description', true );
+        $og_image = get_post_meta( $post_id, '_yoast_wpseo_opengraph-image', true );
+    }
+
+    // Fallback OG title to document title.
+    if ( ! $og_title ) {
+        $og_title = wp_get_document_title();
+    }
+
+    // Fallback OG description to meta description.
+    if ( ! $og_desc ) {
+        $og_desc = $description;
+    }
+
+    // Fallback OG image to featured image.
+    if ( ! $og_image && is_singular() ) {
+        $og_image = get_the_post_thumbnail_url( get_queried_object_id(), 'large' );
+    }
+
+    if ( $og_title ) {
+        printf( '<meta property="og:title" content="%s" />' . "\n", esc_attr( $og_title ) );
+    }
+    if ( $og_desc ) {
+        printf( '<meta property="og:description" content="%s" />' . "\n", esc_attr( $og_desc ) );
+    }
+    if ( $og_image ) {
+        printf( '<meta property="og:image" content="%s" />' . "\n", esc_url( $og_image ) );
+    }
+    printf( '<meta property="og:url" content="%s" />' . "\n", esc_url( $og_url ) );
+    printf( '<meta property="og:type" content="%s" />' . "\n", is_singular() ? 'article' : 'website' );
+    printf( '<meta property="og:site_name" content="%s" />' . "\n", esc_attr( $vars['sitename'] ) );
+}, 1 );
