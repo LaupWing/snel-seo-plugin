@@ -8,11 +8,17 @@ import Tabs from './Tabs';
 import SocialPreview from './SocialPreview';
 
 export default function SeoMetaBox() {
-    const [ seoTitle, setSeoTitle ] = useState( '' );
-    const [ metaDesc, setMetaDesc ] = useState( '' );
+    // seoTitle and metaDesc are now objects: { nl: "...", en: "...", de: "..." }
+    const [ seoTitle, setSeoTitle ] = useState( {} );
+    const [ metaDesc, setMetaDesc ] = useState( {} );
     const [ activeTab, setActiveTab ] = useState( 'seo' );
+    const [ activeLang, setActiveLang ] = useState( window.snelSeoEditor?.defaultLang || 'en' );
     const [ generatingTitle, setGeneratingTitle ] = useState( false );
     const [ generatingDesc, setGeneratingDesc ] = useState( false );
+
+    const isMultilingual = window.snelSeoEditor?.multilingual || false;
+    const languages = window.snelSeoEditor?.languages || [];
+    const defaultLang = window.snelSeoEditor?.defaultLang || 'en';
 
     // Get post info from the editor store
     const { postId, postTitle, permalink, isSaving, featuredImageUrl } = useSelect( ( select ) => {
@@ -37,8 +43,8 @@ export default function SeoMetaBox() {
         } )
             .then( ( res ) => res.json() )
             .then( ( data ) => {
-                setSeoTitle( data.seo_title || '' );
-                setMetaDesc( data.metadesc || '' );
+                setSeoTitle( data.seo_title || {} );
+                setMetaDesc( data.metadesc || {} );
             } )
             .catch( () => {} );
     }, [ postId ] );
@@ -53,7 +59,6 @@ export default function SeoMetaBox() {
 
         if ( ! isSaving && wasSaving ) {
             setWasSaving( false );
-            // Post just finished saving — save our meta too
             if ( postId ) {
                 fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
                     method: 'POST',
@@ -70,11 +75,19 @@ export default function SeoMetaBox() {
         }
     }, [ isSaving ] );
 
+    // Update a language value in the object
+    const updateTitle = ( value ) => {
+        setSeoTitle( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
+    };
+
+    const updateDesc = ( value ) => {
+        setMetaDesc( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
+    };
+
     // AI generate
     const handleGenerate = async ( type ) => {
         if ( ! postId ) return;
         const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
-        const setValue = type === 'title' ? setSeoTitle : setMetaDesc;
         setLoading( true );
 
         try {
@@ -84,11 +97,15 @@ export default function SeoMetaBox() {
                     'Content-Type': 'application/json',
                     'X-WP-Nonce': window.snelSeoEditor.nonce,
                 },
-                body: JSON.stringify( { type } ),
+                body: JSON.stringify( { type, lang: activeLang } ),
             } );
             const data = await res.json();
             if ( data.result ) {
-                setValue( data.result );
+                if ( type === 'title' ) {
+                    updateTitle( data.result );
+                } else {
+                    updateDesc( data.result );
+                }
             }
         } catch {
             // Silently fail
@@ -97,7 +114,7 @@ export default function SeoMetaBox() {
         setLoading( false );
     };
 
-    // Resolve the preview title
+    // Resolve the preview title for current language
     const settings = window.snelSeoEditor?.settings || {};
     const sepChar = {
         'sc-dash': '–', 'sc-hyphen': '-', 'sc-pipe': '|',
@@ -105,15 +122,18 @@ export default function SeoMetaBox() {
     }[ settings.separator ] || '–';
 
     const siteName = settings.website_name || '';
-    const previewTitle = seoTitle
-        ? seoTitle
+    const currentTitle = seoTitle[ activeLang ] || '';
+    const currentDesc = metaDesc[ activeLang ] || '';
+
+    const previewTitle = currentTitle
+        ? currentTitle
             .replace( /%%title%%/g, postTitle )
             .replace( /%%sitename%%/g, siteName )
             .replace( /%%separator%%/g, sepChar )
         : `${ postTitle } ${ sepChar } ${ siteName }`;
 
-    const isConfigured = seoTitle || metaDesc;
-    const statusBadge = isConfigured
+    const hasAnyContent = Object.values( seoTitle ).some( ( v ) => v ) || Object.values( metaDesc ).some( ( v ) => v );
+    const statusBadge = hasAnyContent
         ? { label: __( 'Configured', 'snel-seo' ), className: 'bg-emerald-100 text-emerald-600' }
         : { label: __( 'Not set', 'snel-seo' ), className: 'bg-amber-100 text-amber-600' };
 
@@ -136,11 +156,32 @@ export default function SeoMetaBox() {
             {/* SEO Tab */}
             { activeTab === 'seo' && (
                 <div className="space-y-4">
+                    {/* Language switcher */}
+                    { isMultilingual && (
+                        <div className="flex items-center gap-1 pb-3 border-b border-gray-100">
+                            { languages.map( ( lang ) => (
+                                <button
+                                    key={ lang.code }
+                                    onClick={ () => setActiveLang( lang.code ) }
+                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                    }` }
+                                >
+                                    { lang.label }
+                                    { ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
+                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                                    ) }
+                                </button>
+                            ) ) }
+                        </div>
+                    ) }
+
                     <div>
                         <TemplateInput
-                            label={ __( 'SEO Title', 'snel-seo' ) }
-                            value={ seoTitle }
-                            onChange={ setSeoTitle }
+                            label={ __( 'SEO Title', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                            value={ currentTitle }
+                            onChange={ updateTitle }
                             badgeGroup="page"
                         />
                         <button
@@ -156,9 +197,9 @@ export default function SeoMetaBox() {
 
                     <div>
                         <TemplateInput
-                            label={ __( 'Meta Description', 'snel-seo' ) }
-                            value={ metaDesc }
-                            onChange={ setMetaDesc }
+                            label={ __( 'Meta Description', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                            value={ currentDesc }
+                            onChange={ updateDesc }
                             badgeGroup="page"
                             maxLength={ 160 }
                         />
@@ -176,7 +217,7 @@ export default function SeoMetaBox() {
                     <GooglePreview
                         title={ previewTitle }
                         url={ permalink }
-                        description={ metaDesc }
+                        description={ currentDesc }
                     />
                 </div>
             ) }
@@ -185,7 +226,7 @@ export default function SeoMetaBox() {
             { activeTab === 'social' && (
                 <SocialPreview
                     title={ previewTitle }
-                    description={ metaDesc }
+                    description={ currentDesc }
                     url={ permalink }
                     imageUrl={ featuredImageUrl || window.snelSeoEditor?.settings?.default_og_image }
                 />

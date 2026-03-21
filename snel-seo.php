@@ -17,6 +17,46 @@ define( 'SNEL_SEO_VERSION', '1.0.0' );
 define( 'SNEL_SEO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SNEL_SEO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+// ─── Language Integration (Lego block) ───────────────────────────────────────
+
+/**
+ * Get available languages. Themes/plugins hook into 'snel_seo_languages' to provide their list.
+ * Returns array of [ 'code' => 'nl', 'label' => 'NL', 'default' => true ].
+ */
+function snel_seo_get_languages() {
+    return apply_filters( 'snel_seo_languages', array(
+        array( 'code' => 'en', 'label' => 'EN', 'default' => true ),
+    ) );
+}
+
+/**
+ * Get the default language code.
+ */
+function snel_seo_get_default_lang() {
+    $langs = snel_seo_get_languages();
+    foreach ( $langs as $lang ) {
+        if ( ! empty( $lang['default'] ) ) {
+            return $lang['code'];
+        }
+    }
+    return $langs[0]['code'] ?? 'en';
+}
+
+/**
+ * Get the current language being viewed on the frontend.
+ * Themes/plugins hook into 'snel_seo_current_language' to answer.
+ */
+function snel_seo_get_current_lang() {
+    return apply_filters( 'snel_seo_current_language', snel_seo_get_default_lang() );
+}
+
+/**
+ * Check if the site is multilingual (more than 1 language).
+ */
+function snel_seo_is_multilingual() {
+    return count( snel_seo_get_languages() ) > 1;
+}
+
 /**
  * Register admin menu and submenu pages.
  */
@@ -239,10 +279,14 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     $settings = get_option( 'wpseo_titles', array() );
     $vars     = snel_seo_get_vars();
 
-    // Per-page override (Yoast-compatible post meta).
+    // Per-page override (multilingual).
     if ( is_singular() ) {
-        $post_id    = get_queried_object_id();
-        $custom     = get_post_meta( $post_id, '_yoast_wpseo_title', true );
+        $post_id  = get_queried_object_id();
+        $raw      = get_post_meta( $post_id, '_snel_seo_title', true );
+        $titles   = $raw ? json_decode( $raw, true ) : array();
+        $lang     = snel_seo_get_current_lang();
+        $default  = snel_seo_get_default_lang();
+        $custom   = ! empty( $titles[ $lang ] ) ? $titles[ $lang ] : ( ! empty( $titles[ $default ] ) ? $titles[ $default ] : '' );
         if ( $custom ) {
             return snel_seo_resolve_template( $custom, $vars );
         }
@@ -287,10 +331,14 @@ add_action( 'wp_head', function () {
     // ── Meta Description ──
     $description = '';
 
-    // Per-page override.
+    // Per-page override (multilingual).
     if ( is_singular() ) {
         $post_id = get_queried_object_id();
-        $custom  = get_post_meta( $post_id, '_yoast_wpseo_metadesc', true );
+        $raw     = get_post_meta( $post_id, '_snel_seo_metadesc', true );
+        $descs   = $raw ? json_decode( $raw, true ) : array();
+        $lang    = snel_seo_get_current_lang();
+        $default = snel_seo_get_default_lang();
+        $custom  = ! empty( $descs[ $lang ] ) ? $descs[ $lang ] : ( ! empty( $descs[ $default ] ) ? $descs[ $default ] : '' );
         if ( $custom ) {
             $description = $custom;
         }
@@ -412,11 +460,16 @@ add_action( 'enqueue_block_editor_assets', function () {
 
     $settings = get_option( 'wpseo_titles', array() );
 
+    $languages = snel_seo_get_languages();
+
     wp_localize_script( 'snel-seo-editor', 'snelSeoEditor', array(
-        'restUrl'     => rest_url( 'snel-seo/v1/post-meta' ),
-        'generateUrl' => rest_url( 'snel-seo/v1/generate' ),
-        'nonce'       => wp_create_nonce( 'wp_rest' ),
-        'settings' => array(
+        'restUrl'      => rest_url( 'snel-seo/v1/post-meta' ),
+        'generateUrl'  => rest_url( 'snel-seo/v1/generate' ),
+        'nonce'        => wp_create_nonce( 'wp_rest' ),
+        'languages'    => $languages,
+        'defaultLang'  => snel_seo_get_default_lang(),
+        'multilingual' => snel_seo_is_multilingual(),
+        'settings'     => array(
             'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
             'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
             'default_og_image' => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
@@ -426,16 +479,20 @@ add_action( 'enqueue_block_editor_assets', function () {
 
 /**
  * Register REST endpoints for per-post SEO meta.
+ * Stores as JSON objects: { nl: "...", en: "...", de: "..." }
  */
 add_action( 'rest_api_init', function () {
     register_rest_route( 'snel-seo/v1', '/post-meta/(?P<id>\d+)', array(
         array(
             'methods'             => 'GET',
             'callback'            => function ( $request ) {
-                $post_id = (int) $request['id'];
+                $post_id   = (int) $request['id'];
+                $seo_title = get_post_meta( $post_id, '_snel_seo_title', true );
+                $metadesc  = get_post_meta( $post_id, '_snel_seo_metadesc', true );
+
                 return rest_ensure_response( array(
-                    'seo_title' => get_post_meta( $post_id, '_yoast_wpseo_title', true ),
-                    'metadesc'  => get_post_meta( $post_id, '_yoast_wpseo_metadesc', true ),
+                    'seo_title' => $seo_title ? json_decode( $seo_title, true ) : new \stdClass(),
+                    'metadesc'  => $metadesc ? json_decode( $metadesc, true ) : new \stdClass(),
                 ) );
             },
             'permission_callback' => function ( $request ) {
@@ -449,10 +506,10 @@ add_action( 'rest_api_init', function () {
                 $params  = $request->get_json_params();
 
                 if ( isset( $params['seo_title'] ) ) {
-                    update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $params['seo_title'] ) );
+                    update_post_meta( $post_id, '_snel_seo_title', wp_json_encode( $params['seo_title'] ) );
                 }
                 if ( isset( $params['metadesc'] ) ) {
-                    update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $params['metadesc'] ) );
+                    update_post_meta( $post_id, '_snel_seo_metadesc', wp_json_encode( $params['metadesc'] ) );
                 }
 
                 return rest_ensure_response( array( 'success' => true ) );
@@ -484,6 +541,16 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     $post_id = (int) $request['id'];
     $params  = $request->get_json_params();
     $type    = isset( $params['type'] ) ? $params['type'] : 'description';
+    $lang    = isset( $params['lang'] ) ? $params['lang'] : snel_seo_get_default_lang();
+
+    $lang_names = array(
+        'nl' => 'Dutch', 'en' => 'English', 'de' => 'German',
+        'fr' => 'French', 'es' => 'Spanish', 'it' => 'Italian',
+        'pt' => 'Portuguese', 'ja' => 'Japanese', 'zh' => 'Chinese',
+        'ko' => 'Korean', 'ar' => 'Arabic', 'ru' => 'Russian',
+        'pl' => 'Polish', 'tr' => 'Turkish', 'sv' => 'Swedish',
+    );
+    $lang_name = isset( $lang_names[ $lang ] ) ? $lang_names[ $lang ] : $lang;
 
     // Get API key — check plugin constant, then theme constant, then option.
     $api_key = '';
@@ -510,15 +577,15 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     $title   = $post->post_title;
 
     if ( 'title' === $type ) {
-        $prompt = "Generate an SEO-optimized title for the following page. "
+        $prompt = "Generate an SEO-optimized title in {$lang_name} for the following page. "
                 . "Keep it under 60 characters. Make it compelling and click-worthy. "
-                . "Return ONLY the title, nothing else.\n\n"
+                . "Write in {$lang_name}. Return ONLY the title, nothing else.\n\n"
                 . "Page title: {$title}\n"
                 . "Page content: {$content}";
     } else {
-        $prompt = "Generate an SEO-optimized meta description for the following page. "
+        $prompt = "Generate an SEO-optimized meta description in {$lang_name} for the following page. "
                 . "Keep it between 120-155 characters. Make it compelling and include a call to action if appropriate. "
-                . "Return ONLY the meta description, nothing else.\n\n"
+                . "Write in {$lang_name}. Return ONLY the meta description, nothing else.\n\n"
                 . "Page title: {$title}\n"
                 . "Page content: {$content}";
     }
@@ -559,11 +626,11 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
 }
 
 /**
- * Register Yoast-compatible meta keys so they're accessible via REST API.
+ * Register SEO meta keys so they're accessible via REST API.
  */
 add_action( 'init', function () {
     $post_types = get_post_types( array( 'public' => true ) );
-    $meta_keys  = array( '_yoast_wpseo_title', '_yoast_wpseo_metadesc' );
+    $meta_keys  = array( '_snel_seo_title', '_snel_seo_metadesc' );
 
     foreach ( $post_types as $post_type ) {
         foreach ( $meta_keys as $key ) {
