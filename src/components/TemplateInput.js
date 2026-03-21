@@ -1,5 +1,6 @@
 import { useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
+import { RotateCcw } from 'lucide-react';
 
 const BADGE_GROUPS = {
     homepage: [
@@ -20,7 +21,7 @@ const BADGE_GROUPS = {
     ],
 };
 
-export default function TemplateInput( { label, value, onChange, badgeGroup, preview, maxLength } ) {
+export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue } ) {
     const inputRef = useRef( null );
     const badges = BADGE_GROUPS[ badgeGroup ] || BADGE_GROUPS.page;
 
@@ -49,11 +50,25 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, pre
     const isTextarea = maxLength > 0;
     const InputTag = isTextarea ? 'textarea' : 'input';
 
+    const showReset = defaultValue && value !== defaultValue;
+
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-                { label }
-            </label>
+            <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">
+                    { label }
+                </label>
+                { showReset && (
+                    <button
+                        type="button"
+                        onClick={ () => onChange( defaultValue ) }
+                        className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-blue-600 transition-colors"
+                    >
+                        <RotateCcw size={ 12 } />
+                        { __( 'Reset', 'snel-seo' ) }
+                    </button>
+                ) }
+            </div>
             <InputTag
                 ref={ inputRef }
                 type={ isTextarea ? undefined : 'text' }

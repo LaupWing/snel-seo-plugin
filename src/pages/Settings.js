@@ -172,6 +172,7 @@ export default function Settings() {
                             value={ settings.title_home }
                             onChange={ ( v ) => update( 'title_home', v ) }
                             badgeGroup="homepage"
+                            defaultValue="%%sitename%% %%separator%% %%sitedesc%%"
                         />
                         <TemplateInput
                             label={ __( 'Meta Description', 'snel-seo' ) }
@@ -195,6 +196,7 @@ export default function Settings() {
                             value={ settings.title_page }
                             onChange={ ( v ) => update( 'title_page', v ) }
                             badgeGroup="page"
+                            defaultValue="%%title%% %%separator%% %%sitename%%"
                         />
                         <TemplateInput
                             label={ __( 'Default Meta Description', 'snel-seo' ) }
@@ -218,6 +220,7 @@ export default function Settings() {
                             value={ settings.title_post }
                             onChange={ ( v ) => update( 'title_post', v ) }
                             badgeGroup="post"
+                            defaultValue="%%title%% %%separator%% %%sitename%%"
                         />
                         <TemplateInput
                             label={ __( 'Default Meta Description', 'snel-seo' ) }
