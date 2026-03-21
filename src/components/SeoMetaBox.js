@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { Search, Share2, Settings } from 'lucide-react';
+import { Search, Share2, Settings, Sparkles } from 'lucide-react';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
 import Tabs from './Tabs';
@@ -11,6 +11,8 @@ export default function SeoMetaBox() {
     const [ seoTitle, setSeoTitle ] = useState( '' );
     const [ metaDesc, setMetaDesc ] = useState( '' );
     const [ activeTab, setActiveTab ] = useState( 'seo' );
+    const [ generatingTitle, setGeneratingTitle ] = useState( false );
+    const [ generatingDesc, setGeneratingDesc ] = useState( false );
 
     // Get post info from the editor store
     const { postId, postTitle, permalink, isSaving, featuredImageUrl } = useSelect( ( select ) => {
@@ -68,6 +70,33 @@ export default function SeoMetaBox() {
         }
     }, [ isSaving ] );
 
+    // AI generate
+    const handleGenerate = async ( type ) => {
+        if ( ! postId ) return;
+        const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
+        const setValue = type === 'title' ? setSeoTitle : setMetaDesc;
+        setLoading( true );
+
+        try {
+            const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': window.snelSeoEditor.nonce,
+                },
+                body: JSON.stringify( { type } ),
+            } );
+            const data = await res.json();
+            if ( data.result ) {
+                setValue( data.result );
+            }
+        } catch {
+            // Silently fail
+        }
+
+        setLoading( false );
+    };
+
     // Resolve the preview title
     const settings = window.snelSeoEditor?.settings || {};
     const sepChar = {
@@ -107,20 +136,42 @@ export default function SeoMetaBox() {
             {/* SEO Tab */}
             { activeTab === 'seo' && (
                 <div className="space-y-4">
-                    <TemplateInput
-                        label={ __( 'SEO Title', 'snel-seo' ) }
-                        value={ seoTitle }
-                        onChange={ setSeoTitle }
-                        badgeGroup="page"
-                    />
+                    <div>
+                        <TemplateInput
+                            label={ __( 'SEO Title', 'snel-seo' ) }
+                            value={ seoTitle }
+                            onChange={ setSeoTitle }
+                            badgeGroup="page"
+                        />
+                        <button
+                            type="button"
+                            onClick={ () => handleGenerate( 'title' ) }
+                            disabled={ generatingTitle }
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50"
+                        >
+                            <Sparkles size={ 12 } className={ generatingTitle ? 'animate-spin' : '' } />
+                            { generatingTitle ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) }
+                        </button>
+                    </div>
 
-                    <TemplateInput
-                        label={ __( 'Meta Description', 'snel-seo' ) }
-                        value={ metaDesc }
-                        onChange={ setMetaDesc }
-                        badgeGroup="page"
-                        maxLength={ 160 }
-                    />
+                    <div>
+                        <TemplateInput
+                            label={ __( 'Meta Description', 'snel-seo' ) }
+                            value={ metaDesc }
+                            onChange={ setMetaDesc }
+                            badgeGroup="page"
+                            maxLength={ 160 }
+                        />
+                        <button
+                            type="button"
+                            onClick={ () => handleGenerate( 'description' ) }
+                            disabled={ generatingDesc }
+                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50"
+                        >
+                            <Sparkles size={ 12 } className={ generatingDesc ? 'animate-spin' : '' } />
+                            { generatingDesc ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) }
+                        </button>
+                    </div>
 
                     <GooglePreview
                         title={ previewTitle }

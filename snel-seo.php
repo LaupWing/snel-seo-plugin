@@ -413,8 +413,9 @@ add_action( 'enqueue_block_editor_assets', function () {
     $settings = get_option( 'wpseo_titles', array() );
 
     wp_localize_script( 'snel-seo-editor', 'snelSeoEditor', array(
-        'restUrl'  => rest_url( 'snel-seo/v1/post-meta' ),
-        'nonce'    => wp_create_nonce( 'wp_rest' ),
+        'restUrl'     => rest_url( 'snel-seo/v1/post-meta' ),
+        'generateUrl' => rest_url( 'snel-seo/v1/generate' ),
+        'nonce'       => wp_create_nonce( 'wp_rest' ),
         'settings' => array(
             'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
             'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
@@ -462,6 +463,100 @@ add_action( 'rest_api_init', function () {
         ),
     ) );
 } );
+
+/**
+ * REST endpoint: AI-generate meta description from post content.
+ */
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'snel-seo/v1', '/generate/(?P<id>\d+)', array(
+        'methods'             => 'POST',
+        'callback'            => 'snel_seo_generate_meta',
+        'permission_callback' => function ( $request ) {
+            return current_user_can( 'edit_post', $request['id'] );
+        },
+    ) );
+} );
+
+/**
+ * Generate SEO meta description or title via OpenAI.
+ */
+function snel_seo_generate_meta( WP_REST_Request $request ) {
+    $post_id = (int) $request['id'];
+    $params  = $request->get_json_params();
+    $type    = isset( $params['type'] ) ? $params['type'] : 'description';
+
+    // Get API key — check plugin constant, then theme constant, then option.
+    $api_key = '';
+    if ( defined( 'SNEL_SEO_OPENAI_KEY' ) ) {
+        $api_key = SNEL_SEO_OPENAI_KEY;
+    } elseif ( defined( 'AW_OPENAI_API_KEY' ) ) {
+        $api_key = AW_OPENAI_API_KEY;
+    } else {
+        $api_key = get_option( 'snel_seo_openai_key', '' );
+    }
+
+    if ( empty( $api_key ) ) {
+        return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Add SNEL_SEO_OPENAI_KEY to wp-config.php.', array( 'status' => 400 ) );
+    }
+
+    $post = get_post( $post_id );
+    if ( ! $post ) {
+        return new WP_Error( 'no_post', 'Post not found.', array( 'status' => 404 ) );
+    }
+
+    // Strip blocks/HTML to get plain text content.
+    $content = wp_strip_all_tags( do_blocks( $post->post_content ) );
+    $content = mb_substr( $content, 0, 3000 ); // Limit to 3000 chars for the API.
+    $title   = $post->post_title;
+
+    if ( 'title' === $type ) {
+        $prompt = "Generate an SEO-optimized title for the following page. "
+                . "Keep it under 60 characters. Make it compelling and click-worthy. "
+                . "Return ONLY the title, nothing else.\n\n"
+                . "Page title: {$title}\n"
+                . "Page content: {$content}";
+    } else {
+        $prompt = "Generate an SEO-optimized meta description for the following page. "
+                . "Keep it between 120-155 characters. Make it compelling and include a call to action if appropriate. "
+                . "Return ONLY the meta description, nothing else.\n\n"
+                . "Page title: {$title}\n"
+                . "Page content: {$content}";
+    }
+
+    $model    = get_option( 'snel_seo_openai_model', 'gpt-4o-mini' );
+    $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+        'timeout' => 30,
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $api_key,
+            'Content-Type'  => 'application/json',
+        ),
+        'body' => wp_json_encode( array(
+            'model'       => $model,
+            'messages'    => array(
+                array( 'role' => 'system', 'content' => 'You are an SEO expert. Write concise, compelling meta content that drives clicks from search results.' ),
+                array( 'role' => 'user', 'content' => $prompt ),
+            ),
+            'temperature' => 0.7,
+        ) ),
+    ) );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+    }
+
+    $status_code = wp_remote_retrieve_response_code( $response );
+    if ( 200 !== $status_code ) {
+        return new WP_Error( 'api_error', 'OpenAI returned status ' . $status_code, array( 'status' => 500 ) );
+    }
+
+    $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+    $result = trim( $body['choices'][0]['message']['content'] ?? '' );
+
+    // Remove wrapping quotes if present.
+    $result = trim( $result, '"\'' );
+
+    return rest_ensure_response( array( 'result' => $result ) );
+}
 
 /**
  * Register Yoast-compatible meta keys so they're accessible via REST API.
