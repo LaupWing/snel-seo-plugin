@@ -135,6 +135,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
             'title_page'    => isset( $settings['title-page'] ) ? $settings['title-page'] : '%%title%% %%separator%% %%sitename%%',
             'metadesc_page' => isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '',
         ),
+        'favicon'  => get_site_icon_url( 28 ),
         'siteUrl'  => home_url(),
         'siteName' => get_bloginfo( 'name' ),
         'siteDesc' => get_bloginfo( 'description' ),
