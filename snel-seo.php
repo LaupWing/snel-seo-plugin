@@ -360,7 +360,7 @@ add_action( 'add_meta_boxes', function () {
     foreach ( $post_types as $post_type ) {
         add_meta_box(
             'snel-seo-metabox',
-            'Snel <em style="font-family:serif;font-style:italic;font-weight:normal;">SEO</em>',
+            '<span>Snel <em style="font-family:serif;font-style:italic;font-weight:normal;">SEO</em></span>',
             'snel_seo_render_metabox',
             $post_type,
             'normal',
