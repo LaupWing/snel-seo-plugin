@@ -22,7 +22,7 @@ const BADGE_GROUPS = {
     ],
 };
 
-export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue } ) {
+export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action } ) {
     const inputRef = useRef( null );
     const badges = BADGE_GROUPS[ badgeGroup ] || BADGE_GROUPS.page;
 
@@ -56,9 +56,12 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, max
     return (
         <div>
             <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-medium text-gray-700">
-                    { label }
-                </label>
+                <div className="flex items-center gap-1.5">
+                    <label className="block text-sm font-medium text-gray-700">
+                        { label }
+                    </label>
+                    { action }
+                </div>
                 { showReset && (
                     <button
                         type="button"

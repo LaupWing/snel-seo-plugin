@@ -564,9 +564,21 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     }
 
     // Strip blocks/HTML to get plain text content.
-    $content = wp_strip_all_tags( do_blocks( $post->post_content ) );
-    $content = mb_substr( $content, 0, 3000 ); // Limit to 3000 chars for the API.
+    // Render blocks to HTML, then extract only headings and paragraphs.
+    $html  = do_blocks( $post->post_content );
+    $texts = array();
+    if ( preg_match_all( '/<(?:h[1-6]|p)\b[^>]*>(.+?)<\/(?:h[1-6]|p)>/is', $html, $matches ) ) {
+        foreach ( $matches[1] as $inner ) {
+            $clean = trim( wp_strip_all_tags( $inner ) );
+            if ( $clean && strlen( $clean ) > 3 ) {
+                $texts[] = $clean;
+            }
+        }
+    }
+    $content = implode( "\n", $texts );
+    $content = mb_substr( $content, 0, 3000 );
     $title   = $post->post_title;
+
 
     if ( 'title' === $type ) {
         $prompt = "Generate an SEO-optimized title in {$lang_name} for the following page. "

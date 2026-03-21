@@ -284,42 +284,44 @@ export default function SeoMetaBox() {
             {/* SEO Tab */}
             { activeTab === 'seo' && (
                 <div className="space-y-4">
-                    <div>
-                        <TemplateInput
-                            label={ __( 'SEO Title', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ currentTitle }
-                            onChange={ updateTitle }
-                            badgeGroup="page"
-                        />
-                        <button
-                            type="button"
-                            onClick={ () => handleGenerate( 'title' ) }
-                            disabled={ generatingTitle }
-                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50"
-                        >
-                            <Sparkles size={ 12 } className={ generatingTitle ? 'animate-spin' : '' } />
-                            { generatingTitle ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) }
-                        </button>
-                    </div>
+                    <TemplateInput
+                        label={ __( 'SEO Title', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                        value={ currentTitle }
+                        onChange={ updateTitle }
+                        badgeGroup="page"
+                        action={
+                            <Tooltip text={ generatingTitle ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) } delay={ 100 }>
+                                <button
+                                    type="button"
+                                    onClick={ () => handleGenerate( 'title' ) }
+                                    disabled={ generatingTitle }
+                                    className="p-1 rounded hover:bg-purple-50 transition-colors disabled:opacity-50"
+                                >
+                                    <Sparkles size={ 14 } className={ `text-purple-400 hover:text-purple-600 ${ generatingTitle ? 'animate-spin' : '' }` } />
+                                </button>
+                            </Tooltip>
+                        }
+                    />
 
-                    <div>
-                        <TemplateInput
-                            label={ __( 'Meta Description', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ currentDesc }
-                            onChange={ updateDesc }
-                            badgeGroup="page"
-                            maxLength={ 160 }
-                        />
-                        <button
-                            type="button"
-                            onClick={ () => handleGenerate( 'description' ) }
-                            disabled={ generatingDesc }
-                            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50"
-                        >
-                            <Sparkles size={ 12 } className={ generatingDesc ? 'animate-spin' : '' } />
-                            { generatingDesc ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) }
-                        </button>
-                    </div>
+                    <TemplateInput
+                        label={ __( 'Meta Description', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                        value={ currentDesc }
+                        onChange={ updateDesc }
+                        badgeGroup="page"
+                        maxLength={ 160 }
+                        action={
+                            <Tooltip text={ generatingDesc ? __( 'Generating...', 'snel-seo' ) : __( 'Generate with AI', 'snel-seo' ) } delay={ 100 }>
+                                <button
+                                    type="button"
+                                    onClick={ () => handleGenerate( 'description' ) }
+                                    disabled={ generatingDesc }
+                                    className="p-1 rounded hover:bg-purple-50 transition-colors disabled:opacity-50"
+                                >
+                                    <Sparkles size={ 14 } className={ `text-purple-400 hover:text-purple-600 ${ generatingDesc ? 'animate-spin' : '' }` } />
+                                </button>
+                            </Tooltip>
+                        }
+                    />
 
                     <GooglePreview
                         title={ previewTitle }
