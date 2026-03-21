@@ -84,8 +84,13 @@ export default function SeoMetaBox() {
             if ( data.result ) {
                 if ( type === 'title' ) updateTitle( data.result );
                 else updateDesc( data.result );
+            } else {
+                const msg = data.message || data.data?.message || 'Generation failed.';
+                alert( `Snel SEO: ${ msg }` );
             }
-        } catch {}
+        } catch ( err ) {
+            alert( `Snel SEO: Network error — ${ err.message || 'Could not reach the server.' }` );
+        }
         setLoading( false );
     };
 
@@ -131,8 +136,15 @@ export default function SeoMetaBox() {
                     const data = await res.json();
                     if ( data.result ) {
                         setSeoTitle( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
+                    } else {
+                        const msg = data.message || data.data?.message || 'Title generation failed.';
+                        alert( `Snel SEO (${ lang.label }): ${ msg }` );
+                        break;
                     }
-                } catch {}
+                } catch ( err ) {
+                    alert( `Snel SEO (${ lang.label }): Network error — ${ err.message || 'Could not reach the server.' }` );
+                    break;
+                }
             }
 
             if ( needsDesc ) {
@@ -145,8 +157,15 @@ export default function SeoMetaBox() {
                     const data = await res.json();
                     if ( data.result ) {
                         setMetaDesc( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
+                    } else {
+                        const msg = data.message || data.data?.message || 'Description generation failed.';
+                        alert( `Snel SEO (${ lang.label }): ${ msg }` );
+                        break;
                     }
-                } catch {}
+                } catch ( err ) {
+                    alert( `Snel SEO (${ lang.label }): Network error — ${ err.message || 'Could not reach the server.' }` );
+                    break;
+                }
             }
 
             await animateBtnText( `${ lang.label } ✓` );
