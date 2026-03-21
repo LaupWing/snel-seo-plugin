@@ -552,18 +552,10 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     );
     $lang_name = isset( $lang_names[ $lang ] ) ? $lang_names[ $lang ] : $lang;
 
-    // Get API key — check plugin constant, then theme constant, then option.
-    $api_key = '';
-    if ( defined( 'SNEL_SEO_OPENAI_KEY' ) ) {
-        $api_key = SNEL_SEO_OPENAI_KEY;
-    } elseif ( defined( 'AW_OPENAI_API_KEY' ) ) {
-        $api_key = AW_OPENAI_API_KEY;
-    } else {
-        $api_key = get_option( 'snel_seo_openai_key', '' );
-    }
-
+    // Get API key from Snelstack settings (unified).
+    $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
     if ( empty( $api_key ) ) {
-        return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Add SNEL_SEO_OPENAI_KEY to wp-config.php.', array( 'status' => 400 ) );
+        return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Go to Snelstack Settings to add your key.', array( 'status' => 400 ) );
     }
 
     $post = get_post( $post_id );
@@ -590,7 +582,7 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
                 . "Page content: {$content}";
     }
 
-    $model    = get_option( 'snel_seo_openai_model', 'gpt-4o-mini' );
+    $model = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
     $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
         'timeout' => 30,
         'headers' => array(
