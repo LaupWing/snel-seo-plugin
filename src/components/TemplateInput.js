@@ -1,23 +1,24 @@
 import { useRef } from '@wordpress/element';
+import { Tooltip } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { RotateCcw } from 'lucide-react';
 
 const BADGE_GROUPS = {
     homepage: [
-        { label: 'Site Name', value: '%%sitename%%' },
-        { label: 'Tagline', value: '%%sitedesc%%' },
-        { label: 'Separator', value: '%%separator%%' },
+        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
+        { label: 'Tagline', value: '%%sitedesc%%', tip: 'Your site tagline from Settings > General' },
+        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. – | /)' },
     ],
     page: [
-        { label: 'Page Title', value: '%%title%%' },
-        { label: 'Site Name', value: '%%sitename%%' },
-        { label: 'Separator', value: '%%separator%%' },
+        { label: 'Page Title', value: '%%title%%', tip: 'The title of the current page' },
+        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
+        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. – | /)' },
     ],
     post: [
-        { label: 'Post Title', value: '%%title%%' },
-        { label: 'Site Name', value: '%%sitename%%' },
-        { label: 'Separator', value: '%%separator%%' },
-        { label: 'Category', value: '%%category%%' },
+        { label: 'Post Title', value: '%%title%%', tip: 'The title of the current post' },
+        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
+        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. – | /)' },
+        { label: 'Category', value: '%%category%%', tip: 'The primary category of the post' },
     ],
 };
 
@@ -81,14 +82,15 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, max
             {/* Badges */}
             <div className="flex flex-wrap gap-1.5 mt-2">
                 { badges.map( ( badge ) => (
-                    <button
-                        key={ badge.value }
-                        type="button"
-                        onClick={ () => insertVariable( badge.value ) }
-                        className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
-                    >
-                        { badge.label }
-                    </button>
+                    <Tooltip key={ badge.value } text={ badge.tip } delay={ 100 }>
+                        <button
+                            type="button"
+                            onClick={ () => insertVariable( badge.value ) }
+                            className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-full hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
+                        >
+                            { badge.label }
+                        </button>
+                    </Tooltip>
                 ) ) }
             </div>
 
