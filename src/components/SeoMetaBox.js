@@ -119,8 +119,8 @@ export default function SeoMetaBox() {
         const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
 
         for ( const lang of otherLangs ) {
-            const needsTitle = seoTitle[ defaultLang ] && ! seoTitle[ lang.code ];
-            const needsDesc = metaDesc[ defaultLang ] && ! metaDesc[ lang.code ];
+            const needsTitle = !! seoTitle[ defaultLang ] || !! seoTitle[ lang.code ];
+            const needsDesc = !! metaDesc[ defaultLang ] || !! metaDesc[ lang.code ];
 
             if ( ! needsTitle && ! needsDesc ) continue;
 
@@ -180,6 +180,7 @@ export default function SeoMetaBox() {
         setTranslatingAll( false );
     };
 
+
     // Count how many languages are missing content
     const missingCount = languages.filter( ( l ) =>
         l.code !== defaultLang && ( ! seoTitle[ l.code ] || ! metaDesc[ l.code ] )
@@ -210,6 +211,7 @@ export default function SeoMetaBox() {
 
     const defaultLangLabel = languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase();
     const hasDefaultContent = seoTitle[ defaultLang ] || metaDesc[ defaultLang ];
+    const hasAnyTranslations = languages.some( ( l ) => l.code !== defaultLang && ( seoTitle[ l.code ] || metaDesc[ l.code ] ) );
     const translateTooltip = ! hasDefaultContent
         ? `Fill in SEO title and meta description in ${ defaultLangLabel } (default language) first to enable translation.`
         : missingCount > 0
@@ -256,7 +258,7 @@ export default function SeoMetaBox() {
                                 <button
                                     type="button"
                                     onClick={ handleTranslateAll }
-                                    disabled={ translatingAll || missingCount === 0 || ! hasDefaultContent }
+                                    disabled={ translatingAll || ( ! hasDefaultContent && ! hasAnyTranslations ) }
                                     className="min-w-[140px] h-[28px] px-3 py-1 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-full overflow-hidden inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     { btnText ? (
@@ -268,7 +270,7 @@ export default function SeoMetaBox() {
                                             <Languages size={ 12 } />
                                             { missingCount > 0
                                                 ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
-                                                : __( 'All translated', 'snel-seo' )
+                                                : __( 'Re-translate All', 'snel-seo' )
                                             }
                                         </span>
                                     ) }
