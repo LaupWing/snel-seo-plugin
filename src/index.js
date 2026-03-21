@@ -3,6 +3,7 @@ import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Redirects from './pages/Redirects';
 import Tools from './pages/Tools';
+import './styles/main.css';
 
 const PAGES = {
     dashboard: Dashboard,
@@ -11,12 +12,22 @@ const PAGES = {
     tools: Tools,
 };
 
-document.addEventListener( 'DOMContentLoaded', () => {
-    const root = document.getElementById( 'snel-seo-root' );
-    if ( ! root ) return;
+function mountApp() {
+    const container = document.getElementById( 'snel-seo-root' );
+    if ( ! container ) return;
 
-    const page = root.dataset.page || 'dashboard';
+    const page = container.dataset.page || 'dashboard';
     const PageComponent = PAGES[ page ] || Dashboard;
 
-    createRoot( root ).render( <PageComponent /> );
-} );
+    createRoot( container ).render(
+        <div className="snel-seo-app">
+            <PageComponent />
+        </div>
+    );
+}
+
+if ( document.readyState === 'loading' ) {
+    document.addEventListener( 'DOMContentLoaded', mountApp );
+} else {
+    mountApp();
+}

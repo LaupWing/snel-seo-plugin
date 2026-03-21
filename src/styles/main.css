@@ -1,0 +1,32 @@
+/**
+ * Tailwind CSS v4
+ *
+ * No prefix — CSS only loads on our plugin pages anyway
+ */
+@import "tailwindcss" important;
+
+/**
+ * Reset WordPress admin defaults inside our plugin
+ */
+.wrap .snel-seo-app {
+  margin: 0;
+  position: relative;
+  min-height: 400px;
+}
+
+.wrap:has(.snel-seo-app) #wpbody-content,
+#wpbody-content:has(.snel-seo-app) {
+  padding-bottom: 10px;
+}
+
+.snel-seo-app h1,
+.snel-seo-app h2,
+.snel-seo-app h3,
+.snel-seo-app h4,
+.snel-seo-app h5,
+.snel-seo-app h6,
+.snel-seo-app p {
+  margin: 0;
+  font-size: inherit;
+  line-height: inherit;
+}
