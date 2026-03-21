@@ -3,6 +3,7 @@ import { __ } from '@wordpress/i18n';
 import { Globe, Home, FileText, PenTool, Save } from 'lucide-react';
 import TemplateInput from '../components/TemplateInput';
 import GooglePreview from '../components/GooglePreview';
+import Tabs from '../components/Tabs';
 
 const SEPARATORS = [
     { label: '–', value: 'sc-dash' },
@@ -108,22 +109,7 @@ export default function Settings() {
                 </div>
             ) }
 
-            {/* Tabs */ }
-            <div className="flex items-center gap-1 mb-6 border-b border-gray-200">
-                { TABS.map( ( tab ) => (
-                    <button
-                        key={ tab.id }
-                        onClick={ () => setActiveTab( tab.id ) }
-                        className={ `flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${ activeTab === tab.id
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }` }
-                    >
-                        <tab.icon size={ 16 } />
-                        { tab.label }
-                    </button>
-                ) ) }
-            </div>
+            <Tabs tabs={ TABS } active={ activeTab } onChange={ setActiveTab } />
 
             {/* Tab content */ }
             <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -137,7 +123,7 @@ export default function Settings() {
                                 type="text"
                                 value={ settings.website_name || '' }
                                 onChange={ ( e ) => update( 'website_name', e.target.value ) }
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
                             <p className="mt-1 text-xs text-gray-400">
                                 { __( 'Used in title templates as %%sitename%%', 'snel-seo' ) }

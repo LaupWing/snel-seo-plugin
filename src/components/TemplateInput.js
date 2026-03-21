@@ -76,7 +76,7 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, max
                 value={ value || '' }
                 onChange={ ( e ) => onChange( e.target.value ) }
                 rows={ isTextarea ? 3 : undefined }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6] resize-none"
             />
 
             {/* Badges */}

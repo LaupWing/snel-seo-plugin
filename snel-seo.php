@@ -349,3 +349,123 @@ add_action( 'wp_head', function () {
     printf( '<meta property="og:type" content="%s" />' . "\n", is_singular() ? 'article' : 'website' );
     printf( '<meta property="og:site_name" content="%s" />' . "\n", esc_attr( $vars['sitename'] ) );
 }, 1 );
+
+// ─── Editor Meta Box ─────────────────────────────────────────────────────────
+
+/**
+ * Register the SEO meta box below the editor.
+ */
+add_action( 'add_meta_boxes', function () {
+    $post_types = get_post_types( array( 'public' => true ) );
+    foreach ( $post_types as $post_type ) {
+        add_meta_box(
+            'snel-seo-metabox',
+            'Snel <em style="font-family:serif;font-style:italic;font-weight:normal;">SEO</em>',
+            'snel_seo_render_metabox',
+            $post_type,
+            'normal',
+            'high'
+        );
+    }
+} );
+
+/**
+ * Render the meta box container (React mounts here).
+ */
+function snel_seo_render_metabox( $post ) {
+    printf(
+        '<div id="snel-seo-metabox-root" data-post-id="%d"></div>',
+        esc_attr( $post->ID )
+    );
+}
+
+/**
+ * Enqueue the editor React app on post edit screens.
+ */
+add_action( 'enqueue_block_editor_assets', function () {
+    $asset_file = SNEL_SEO_PLUGIN_DIR . 'build/editor.asset.php';
+
+    if ( ! file_exists( $asset_file ) ) {
+        return;
+    }
+
+    $asset = require $asset_file;
+
+    wp_enqueue_script(
+        'snel-seo-editor',
+        SNEL_SEO_PLUGIN_URL . 'build/editor.js',
+        $asset['dependencies'],
+        $asset['version'],
+        true
+    );
+
+    wp_enqueue_style(
+        'snel-seo-editor',
+        SNEL_SEO_PLUGIN_URL . 'build/editor.css',
+        array( 'wp-components' ),
+        $asset['version']
+    );
+
+    $settings = get_option( 'wpseo_titles', array() );
+
+    wp_localize_script( 'snel-seo-editor', 'snelSeoEditor', array(
+        'restUrl'  => rest_url( 'snel-seo/v1/post-meta' ),
+        'nonce'    => wp_create_nonce( 'wp_rest' ),
+        'settings' => array(
+            'website_name' => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
+            'separator'    => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
+        ),
+    ) );
+} );
+
+/**
+ * Register REST endpoint for saving per-post SEO meta.
+ */
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'snel-seo/v1', '/post-meta/(?P<id>\d+)', array(
+        'methods'             => 'POST',
+        'callback'            => 'snel_seo_save_post_meta',
+        'permission_callback' => function ( $request ) {
+            return current_user_can( 'edit_post', $request['id'] );
+        },
+    ) );
+} );
+
+/**
+ * Save per-post SEO meta (Yoast-compatible keys).
+ */
+function snel_seo_save_post_meta( WP_REST_Request $request ) {
+    $post_id = (int) $request['id'];
+    $params  = $request->get_json_params();
+
+    if ( isset( $params['seo_title'] ) ) {
+        update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $params['seo_title'] ) );
+    }
+
+    if ( isset( $params['metadesc'] ) ) {
+        update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $params['metadesc'] ) );
+    }
+
+    return rest_ensure_response( array( 'success' => true ) );
+}
+
+/**
+ * Register Yoast-compatible meta keys so they're accessible via REST API.
+ */
+add_action( 'init', function () {
+    $post_types = get_post_types( array( 'public' => true ) );
+    $meta_keys  = array( '_yoast_wpseo_title', '_yoast_wpseo_metadesc' );
+
+    foreach ( $post_types as $post_type ) {
+        foreach ( $meta_keys as $key ) {
+            register_post_meta( $post_type, $key, array(
+                'show_in_rest'  => true,
+                'single'        => true,
+                'type'          => 'string',
+                'auth_callback' => function () {
+                    return current_user_can( 'edit_posts' );
+                },
+            ) );
+        }
+    }
+} );
