@@ -1,24 +1,24 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { Save, Search, Share2, Settings } from 'lucide-react';
+import { Search, Share2, Settings } from 'lucide-react';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
 import Tabs from './Tabs';
 
-export default function SeoMetaBox( { postId } ) {
+export default function SeoMetaBox() {
     const [ seoTitle, setSeoTitle ] = useState( '' );
     const [ metaDesc, setMetaDesc ] = useState( '' );
-    const [ saving, setSaving ] = useState( false );
-    const [ notice, setNotice ] = useState( null );
     const [ activeTab, setActiveTab ] = useState( 'seo' );
 
-    // Get post title and permalink from the editor store
-    const { postTitle, permalink } = useSelect( ( select ) => {
+    // Get post info from the editor store
+    const { postId, postTitle, permalink, isSaving } = useSelect( ( select ) => {
         const editor = select( 'core/editor' );
         return {
+            postId: editor?.getCurrentPostId?.(),
             postTitle: editor?.getEditedPostAttribute?.( 'title' ) || '',
             permalink: editor?.getPermalink?.() || '',
+            isSaving: editor?.isSavingPost?.() || false,
         };
     }, [] );
 
@@ -26,52 +26,43 @@ export default function SeoMetaBox( { postId } ) {
     useEffect( () => {
         if ( ! postId ) return;
 
-        wp.apiFetch( { path: `/wp/v2/pages/${ postId }?context=edit` } )
-            .then( ( post ) => {
-                const meta = post.meta || {};
-                setSeoTitle( meta._yoast_wpseo_title || '' );
-                setMetaDesc( meta._yoast_wpseo_metadesc || '' );
+        fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
+            headers: { 'X-WP-Nonce': window.snelSeoEditor.nonce },
+        } )
+            .then( ( res ) => res.json() )
+            .then( ( data ) => {
+                setSeoTitle( data.seo_title || '' );
+                setMetaDesc( data.metadesc || '' );
             } )
-            .catch( () => {
-                wp.apiFetch( { path: `/wp/v2/posts/${ postId }?context=edit` } )
-                    .then( ( post ) => {
-                        const meta = post.meta || {};
-                        setSeoTitle( meta._yoast_wpseo_title || '' );
-                        setMetaDesc( meta._yoast_wpseo_metadesc || '' );
-                    } )
-                    .catch( () => {} );
-            } );
+            .catch( () => {} );
     }, [ postId ] );
 
-    const handleSave = async () => {
-        setSaving( true );
-        setNotice( null );
+    // Auto-save when WordPress saves the post
+    const [ wasSaving, setWasSaving ] = useState( false );
 
-        try {
-            const res = await fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.snelSeoEditor.nonce,
-                },
-                body: JSON.stringify( {
-                    seo_title: seoTitle,
-                    metadesc: metaDesc,
-                } ),
-            } );
-
-            if ( res.ok ) {
-                setNotice( { type: 'success', message: __( 'SEO data saved.', 'snel-seo' ) } );
-                setTimeout( () => setNotice( null ), 3000 );
-            } else {
-                setNotice( { type: 'error', message: __( 'Failed to save.', 'snel-seo' ) } );
-            }
-        } catch {
-            setNotice( { type: 'error', message: __( 'Network error.', 'snel-seo' ) } );
+    useEffect( () => {
+        if ( isSaving && ! wasSaving ) {
+            setWasSaving( true );
         }
 
-        setSaving( false );
-    };
+        if ( ! isSaving && wasSaving ) {
+            setWasSaving( false );
+            // Post just finished saving — save our meta too
+            if ( postId ) {
+                fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-WP-Nonce': window.snelSeoEditor.nonce,
+                    },
+                    body: JSON.stringify( {
+                        seo_title: seoTitle,
+                        metadesc: metaDesc,
+                    } ),
+                } );
+            }
+        }
+    }, [ isSaving ] );
 
     // Resolve the preview title
     const settings = window.snelSeoEditor?.settings || {};
@@ -107,12 +98,6 @@ export default function SeoMetaBox( { postId } ) {
 
     return (
         <div className="p-4">
-            { notice && (
-                <div className={ `mb-4 px-3 py-2 rounded-lg text-xs ${ notice.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200' }` }>
-                    { notice.message }
-                </div>
-            ) }
-
             <Tabs tabs={ tabs } active={ activeTab } onChange={ setActiveTab } />
 
             {/* SEO Tab */}
@@ -138,17 +123,6 @@ export default function SeoMetaBox( { postId } ) {
                         url={ permalink }
                         description={ metaDesc }
                     />
-
-                    <div className="mt-4">
-                        <button
-                            onClick={ handleSave }
-                            disabled={ saving }
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-                        >
-                            <Save size={ 14 } />
-                            { saving ? __( 'Saving...', 'snel-seo' ) : __( 'Save SEO', 'snel-seo' ) }
-                        </button>
-                    </div>
                 </div>
             ) }
 
@@ -171,7 +145,6 @@ export default function SeoMetaBox( { postId } ) {
                     </p>
                 </div>
             ) }
-
         </div>
     );
 }

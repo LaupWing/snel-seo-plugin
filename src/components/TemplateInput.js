@@ -75,6 +75,7 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, max
                 type={ isTextarea ? undefined : 'text' }
                 value={ value || '' }
                 onChange={ ( e ) => onChange( e.target.value ) }
+                onKeyDown={ ( e ) => e.stopPropagation() }
                 rows={ isTextarea ? 3 : undefined }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6] resize-none"
             />

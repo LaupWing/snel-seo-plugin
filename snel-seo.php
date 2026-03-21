@@ -373,10 +373,7 @@ add_action( 'add_meta_boxes', function () {
  * Render the meta box container (React mounts here).
  */
 function snel_seo_render_metabox( $post ) {
-    printf(
-        '<div id="snel-seo-metabox-root" data-post-id="%d"></div>',
-        esc_attr( $post->ID )
-    );
+    echo '<div id="snel-seo-metabox-root"></div>';
 }
 
 /**
@@ -419,35 +416,44 @@ add_action( 'enqueue_block_editor_assets', function () {
 } );
 
 /**
- * Register REST endpoint for saving per-post SEO meta.
+ * Register REST endpoints for per-post SEO meta.
  */
 add_action( 'rest_api_init', function () {
     register_rest_route( 'snel-seo/v1', '/post-meta/(?P<id>\d+)', array(
-        'methods'             => 'POST',
-        'callback'            => 'snel_seo_save_post_meta',
-        'permission_callback' => function ( $request ) {
-            return current_user_can( 'edit_post', $request['id'] );
-        },
+        array(
+            'methods'             => 'GET',
+            'callback'            => function ( $request ) {
+                $post_id = (int) $request['id'];
+                return rest_ensure_response( array(
+                    'seo_title' => get_post_meta( $post_id, '_yoast_wpseo_title', true ),
+                    'metadesc'  => get_post_meta( $post_id, '_yoast_wpseo_metadesc', true ),
+                ) );
+            },
+            'permission_callback' => function ( $request ) {
+                return current_user_can( 'edit_post', $request['id'] );
+            },
+        ),
+        array(
+            'methods'             => 'POST',
+            'callback'            => function ( $request ) {
+                $post_id = (int) $request['id'];
+                $params  = $request->get_json_params();
+
+                if ( isset( $params['seo_title'] ) ) {
+                    update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $params['seo_title'] ) );
+                }
+                if ( isset( $params['metadesc'] ) ) {
+                    update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $params['metadesc'] ) );
+                }
+
+                return rest_ensure_response( array( 'success' => true ) );
+            },
+            'permission_callback' => function ( $request ) {
+                return current_user_can( 'edit_post', $request['id'] );
+            },
+        ),
     ) );
 } );
-
-/**
- * Save per-post SEO meta (Yoast-compatible keys).
- */
-function snel_seo_save_post_meta( WP_REST_Request $request ) {
-    $post_id = (int) $request['id'];
-    $params  = $request->get_json_params();
-
-    if ( isset( $params['seo_title'] ) ) {
-        update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $params['seo_title'] ) );
-    }
-
-    if ( isset( $params['metadesc'] ) ) {
-        update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_text_field( $params['metadesc'] ) );
-    }
-
-    return rest_ensure_response( array( 'success' => true ) );
-}
 
 /**
  * Register Yoast-compatible meta keys so they're accessible via REST API.
