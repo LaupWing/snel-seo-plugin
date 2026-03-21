@@ -1,26 +1,26 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { Search, Share2, Settings, Sparkles } from 'lucide-react';
+import { Search, Share2, Settings, Sparkles, Languages } from 'lucide-react';
+import { Tooltip } from '@wordpress/components';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
 import Tabs from './Tabs';
 import SocialPreview from './SocialPreview';
 
 export default function SeoMetaBox() {
-    // seoTitle and metaDesc are now objects: { nl: "...", en: "...", de: "..." }
     const [ seoTitle, setSeoTitle ] = useState( {} );
     const [ metaDesc, setMetaDesc ] = useState( {} );
     const [ activeTab, setActiveTab ] = useState( 'seo' );
     const [ activeLang, setActiveLang ] = useState( window.snelSeoEditor?.defaultLang || 'en' );
     const [ generatingTitle, setGeneratingTitle ] = useState( false );
     const [ generatingDesc, setGeneratingDesc ] = useState( false );
+    const [ translatingAll, setTranslatingAll ] = useState( false );
 
     const isMultilingual = window.snelSeoEditor?.multilingual || false;
     const languages = window.snelSeoEditor?.languages || [];
     const defaultLang = window.snelSeoEditor?.defaultLang || 'en';
 
-    // Get post info from the editor store
     const { postId, postTitle, permalink, isSaving, featuredImageUrl } = useSelect( ( select ) => {
         const editor = select( 'core/editor' );
         const featuredImageId = editor?.getEditedPostAttribute?.( 'featured_media' );
@@ -37,7 +37,6 @@ export default function SeoMetaBox() {
     // Load existing meta values
     useEffect( () => {
         if ( ! postId ) return;
-
         fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
             headers: { 'X-WP-Nonce': window.snelSeoEditor.nonce },
         } )
@@ -49,72 +48,93 @@ export default function SeoMetaBox() {
             .catch( () => {} );
     }, [ postId ] );
 
-    // Auto-save when WordPress saves the post
+    // Auto-save when WordPress saves
     const [ wasSaving, setWasSaving ] = useState( false );
-
     useEffect( () => {
-        if ( isSaving && ! wasSaving ) {
-            setWasSaving( true );
-        }
-
+        if ( isSaving && ! wasSaving ) setWasSaving( true );
         if ( ! isSaving && wasSaving ) {
             setWasSaving( false );
             if ( postId ) {
                 fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-WP-Nonce': window.snelSeoEditor.nonce,
-                    },
-                    body: JSON.stringify( {
-                        seo_title: seoTitle,
-                        metadesc: metaDesc,
-                    } ),
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
+                    body: JSON.stringify( { seo_title: seoTitle, metadesc: metaDesc } ),
                 } );
             }
         }
     }, [ isSaving ] );
 
-    // Update a language value in the object
-    const updateTitle = ( value ) => {
-        setSeoTitle( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
-    };
+    const updateTitle = ( value ) => setSeoTitle( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
+    const updateDesc = ( value ) => setMetaDesc( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
 
-    const updateDesc = ( value ) => {
-        setMetaDesc( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
-    };
-
-    // AI generate
+    // AI generate for single language
     const handleGenerate = async ( type ) => {
         if ( ! postId ) return;
         const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
         setLoading( true );
-
         try {
             const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': window.snelSeoEditor.nonce,
-                },
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
                 body: JSON.stringify( { type, lang: activeLang } ),
             } );
             const data = await res.json();
             if ( data.result ) {
-                if ( type === 'title' ) {
-                    updateTitle( data.result );
-                } else {
-                    updateDesc( data.result );
-                }
+                if ( type === 'title' ) updateTitle( data.result );
+                else updateDesc( data.result );
             }
-        } catch {
-            // Silently fail
-        }
-
+        } catch {}
         setLoading( false );
     };
 
-    // Resolve the preview title for current language
+    // Translate All — generate title + description for all non-default languages
+    const handleTranslateAll = async () => {
+        if ( ! postId ) return;
+        setTranslatingAll( true );
+
+        const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
+
+        for ( const lang of otherLangs ) {
+            // Generate title if default has one but this lang doesn't
+            if ( seoTitle[ defaultLang ] && ! seoTitle[ lang.code ] ) {
+                try {
+                    const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
+                        body: JSON.stringify( { type: 'title', lang: lang.code } ),
+                    } );
+                    const data = await res.json();
+                    if ( data.result ) {
+                        setSeoTitle( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
+                    }
+                } catch {}
+            }
+
+            // Generate description if default has one but this lang doesn't
+            if ( metaDesc[ defaultLang ] && ! metaDesc[ lang.code ] ) {
+                try {
+                    const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
+                        body: JSON.stringify( { type: 'description', lang: lang.code } ),
+                    } );
+                    const data = await res.json();
+                    if ( data.result ) {
+                        setMetaDesc( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
+                    }
+                } catch {}
+            }
+        }
+
+        setTranslatingAll( false );
+    };
+
+    // Count how many languages are missing content
+    const missingCount = languages.filter( ( l ) =>
+        l.code !== defaultLang && ( ! seoTitle[ l.code ] || ! metaDesc[ l.code ] )
+    ).length;
+
+    // Resolve preview
     const settings = window.snelSeoEditor?.settings || {};
     const sepChar = {
         'sc-dash': '–', 'sc-hyphen': '-', 'sc-pipe': '|',
@@ -137,46 +157,74 @@ export default function SeoMetaBox() {
         ? { label: __( 'Configured', 'snel-seo' ), className: 'bg-emerald-100 text-emerald-600' }
         : { label: __( 'Not set', 'snel-seo' ), className: 'bg-amber-100 text-amber-600' };
 
+    const defaultLangLabel = languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase();
+    const hasDefaultContent = seoTitle[ defaultLang ] || metaDesc[ defaultLang ];
+    const translateTooltip = ! hasDefaultContent
+        ? `Fill in SEO title and meta description in ${ defaultLangLabel } (default language) first to enable translation.`
+        : missingCount > 0
+            ? `Translate SEO title and description from ${ defaultLangLabel } to all other languages using AI.`
+            : 'All languages have been translated.';
+
     const tabs = [
-        {
-            id: 'seo',
-            label: 'SEO',
-            icon: Search,
-            badge: statusBadge.label,
-            badgeClass: statusBadge.className,
-        },
+        { id: 'seo', label: 'SEO', icon: Search, badge: statusBadge.label, badgeClass: statusBadge.className },
         { id: 'social', label: 'Social', icon: Share2 },
         { id: 'advanced', label: 'Advanced', icon: Settings },
     ];
 
     return (
         <div className="p-4">
+            {/* Language switcher — above tabs */}
+            { isMultilingual && (
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200">
+                    <div className="flex items-center gap-1">
+                        { languages.map( ( lang ) => (
+                            <button
+                                key={ lang.code }
+                                onClick={ () => setActiveLang( lang.code ) }
+                                className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
+                                    ? lang.default ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-blue-600 text-white'
+                                    : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }` }
+                            >
+                                { lang.label }
+                                { lang.default && (
+                                    <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span>
+                                ) }
+                                { ! lang.default && ( seoTitle[ lang.code ] && metaDesc[ lang.code ] ) && (
+                                    <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                                ) }
+                                { ! lang.default && ( ! seoTitle[ lang.code ] || ! metaDesc[ lang.code ] ) && ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
+                                    <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                ) }
+                            </button>
+                        ) ) }
+                    </div>
+                    <Tooltip text={ translateTooltip } delay={ 100 }>
+                        <span className="inline-flex">
+                            <button
+                                type="button"
+                                onClick={ handleTranslateAll }
+                                disabled={ translatingAll || missingCount === 0 || ! hasDefaultContent }
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Languages size={ 12 } className={ translatingAll ? 'animate-spin' : '' } />
+                                { translatingAll
+                                    ? __( 'Translating...', 'snel-seo' )
+                                    : missingCount > 0
+                                        ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
+                                        : __( 'All translated', 'snel-seo' )
+                                }
+                            </button>
+                        </span>
+                    </Tooltip>
+                </div>
+            ) }
+
             <Tabs tabs={ tabs } active={ activeTab } onChange={ setActiveTab } />
 
             {/* SEO Tab */}
             { activeTab === 'seo' && (
                 <div className="space-y-4">
-                    {/* Language switcher */}
-                    { isMultilingual && (
-                        <div className="flex items-center gap-1 pb-3 border-b border-gray-100">
-                            { languages.map( ( lang ) => (
-                                <button
-                                    key={ lang.code }
-                                    onClick={ () => setActiveLang( lang.code ) }
-                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                    }` }
-                                >
-                                    { lang.label }
-                                    { ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
-                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
-                                    ) }
-                                </button>
-                            ) ) }
-                        </div>
-                    ) }
-
                     <div>
                         <TemplateInput
                             label={ __( 'SEO Title', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
