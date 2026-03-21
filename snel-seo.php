@@ -308,24 +308,11 @@ add_action( 'wp_head', function () {
         printf( '<meta name="description" content="%s" />' . "\n", esc_attr( $description ) );
     }
 
-    // ── Canonical URL ──
-    $canonical = '';
-    if ( is_singular() ) {
-        $custom_canonical = get_post_meta( get_queried_object_id(), '_yoast_wpseo_canonical', true );
-        $canonical = $custom_canonical ? $custom_canonical : get_permalink();
-    } elseif ( is_front_page() ) {
-        $canonical = home_url( '/' );
-    }
-
-    if ( $canonical ) {
-        printf( '<link rel="canonical" href="%s" />' . "\n", esc_url( $canonical ) );
-    }
-
     // ── Open Graph ──
     $og_title = '';
     $og_desc  = '';
     $og_image = '';
-    $og_url   = $canonical ?: home_url( '/' );
+    $og_url   = is_singular() ? get_permalink() : home_url( '/' );
 
     if ( is_singular() ) {
         $post_id  = get_queried_object_id();
