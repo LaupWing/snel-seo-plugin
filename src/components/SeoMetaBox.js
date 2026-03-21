@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { Search, Share2, Settings, Sparkles, Languages } from 'lucide-react';
+import { Search, Share2, Settings, Sparkles, Languages, Check, Loader2 } from 'lucide-react';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
@@ -16,6 +16,8 @@ export default function SeoMetaBox() {
     const [ generatingTitle, setGeneratingTitle ] = useState( false );
     const [ generatingDesc, setGeneratingDesc ] = useState( false );
     const [ translatingAll, setTranslatingAll ] = useState( false );
+    // { langCode: 'translating' | 'done' | 'skipped' }
+    const [ translationProgress, setTranslationProgress ] = useState( {} );
 
     const isMultilingual = window.snelSeoEditor?.multilingual || false;
     const languages = window.snelSeoEditor?.languages || [];
@@ -91,12 +93,22 @@ export default function SeoMetaBox() {
     const handleTranslateAll = async () => {
         if ( ! postId ) return;
         setTranslatingAll( true );
+        setTranslationProgress( {} );
 
         const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
 
         for ( const lang of otherLangs ) {
-            // Generate title if default has one but this lang doesn't
-            if ( seoTitle[ defaultLang ] && ! seoTitle[ lang.code ] ) {
+            const needsTitle = seoTitle[ defaultLang ] && ! seoTitle[ lang.code ];
+            const needsDesc = metaDesc[ defaultLang ] && ! metaDesc[ lang.code ];
+
+            if ( ! needsTitle && ! needsDesc ) {
+                setTranslationProgress( ( prev ) => ( { ...prev, [ lang.code ]: 'skipped' } ) );
+                continue;
+            }
+
+            setTranslationProgress( ( prev ) => ( { ...prev, [ lang.code ]: 'translating' } ) );
+
+            if ( needsTitle ) {
                 try {
                     const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
                         method: 'POST',
@@ -110,8 +122,7 @@ export default function SeoMetaBox() {
                 } catch {}
             }
 
-            // Generate description if default has one but this lang doesn't
-            if ( metaDesc[ defaultLang ] && ! metaDesc[ lang.code ] ) {
+            if ( needsDesc ) {
                 try {
                     const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
                         method: 'POST',
@@ -124,9 +135,15 @@ export default function SeoMetaBox() {
                     }
                 } catch {}
             }
+
+            setTranslationProgress( ( prev ) => ( { ...prev, [ lang.code ]: 'done' } ) );
         }
 
-        setTranslatingAll( false );
+        // Keep progress visible for a moment so user sees the checkmarks.
+        setTimeout( () => {
+            setTranslatingAll( false );
+            setTranslationProgress( {} );
+        }, 2000 );
     };
 
     // Count how many languages are missing content
@@ -175,49 +192,74 @@ export default function SeoMetaBox() {
         <div className="p-4">
             {/* Language switcher — above tabs */}
             { isMultilingual && (
-                <div className="flex items-center justify-between pb-3 mb-3 border-b border-gray-200">
-                    <div className="flex items-center gap-1">
-                        { languages.map( ( lang ) => (
-                            <button
-                                key={ lang.code }
-                                onClick={ () => setActiveLang( lang.code ) }
-                                className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                    ? lang.default ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-blue-600 text-white'
-                                    : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                }` }
-                            >
-                                { lang.label }
-                                { lang.default && (
-                                    <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span>
-                                ) }
-                                { ! lang.default && ( seoTitle[ lang.code ] && metaDesc[ lang.code ] ) && (
-                                    <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
-                                ) }
-                                { ! lang.default && ( ! seoTitle[ lang.code ] || ! metaDesc[ lang.code ] ) && ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
-                                    <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                                ) }
-                            </button>
-                        ) ) }
+                <>
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+                        <div className="flex items-center gap-1">
+                            { languages.map( ( lang ) => (
+                                <button
+                                    key={ lang.code }
+                                    onClick={ () => setActiveLang( lang.code ) }
+                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
+                                        ? lang.default ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-blue-600 text-white'
+                                        : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                    }` }
+                                >
+                                    { lang.label }
+                                    { lang.default && (
+                                        <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span>
+                                    ) }
+                                    { ! lang.default && ( seoTitle[ lang.code ] && metaDesc[ lang.code ] ) && (
+                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                                    ) }
+                                    { ! lang.default && ( ! seoTitle[ lang.code ] || ! metaDesc[ lang.code ] ) && ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
+                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                    ) }
+                                </button>
+                            ) ) }
+                        </div>
+                        <Tooltip text={ translateTooltip } delay={ 100 }>
+                            <span className="inline-flex">
+                                <button
+                                    type="button"
+                                    onClick={ handleTranslateAll }
+                                    disabled={ translatingAll || missingCount === 0 || ! hasDefaultContent }
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Languages size={ 12 } className={ translatingAll ? 'animate-spin' : '' } />
+                                    { translatingAll
+                                        ? __( 'Translating...', 'snel-seo' )
+                                        : missingCount > 0
+                                            ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
+                                            : __( 'All translated', 'snel-seo' )
+                                    }
+                                </button>
+                            </span>
+                        </Tooltip>
                     </div>
-                    <Tooltip text={ translateTooltip } delay={ 100 }>
-                        <span className="inline-flex">
-                            <button
-                                type="button"
-                                onClick={ handleTranslateAll }
-                                disabled={ translatingAll || missingCount === 0 || ! hasDefaultContent }
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 bg-purple-50 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Languages size={ 12 } className={ translatingAll ? 'animate-spin' : '' } />
-                                { translatingAll
-                                    ? __( 'Translating...', 'snel-seo' )
-                                    : missingCount > 0
-                                        ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
-                                        : __( 'All translated', 'snel-seo' )
-                                }
-                            </button>
-                        </span>
-                    </Tooltip>
-                </div>
+
+                    { translatingAll && Object.keys( translationProgress ).length > 0 && (
+                        <div className="flex flex-wrap gap-2 py-2">
+                            { languages.filter( ( l ) => l.code !== defaultLang ).map( ( lang ) => {
+                                const status = translationProgress[ lang.code ];
+                                return (
+                                    <div
+                                        key={ lang.code }
+                                        className={ `flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-all duration-300 ${
+                                            status === 'done' ? 'bg-emerald-50 text-emerald-600'
+                                            : status === 'translating' ? 'bg-blue-50 text-blue-600'
+                                            : status === 'skipped' ? 'bg-gray-50 text-gray-400'
+                                            : 'bg-gray-50 text-gray-300'
+                                        }` }
+                                    >
+                                        { status === 'done' && <Check size={ 10 } /> }
+                                        { status === 'translating' && <Loader2 size={ 10 } className="animate-spin" /> }
+                                        { lang.label }
+                                    </div>
+                                );
+                            } ) }
+                        </div>
+                    ) }
+                </>
             ) }
 
             <Tabs tabs={ tabs } active={ activeTab } onChange={ setActiveTab } />
