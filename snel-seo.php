@@ -118,6 +118,8 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         $asset['version']
     );
 
+    wp_enqueue_media();
+
     // Pass settings + REST info to JS.
     $settings = get_option( 'wpseo_titles', array() );
 
@@ -133,7 +135,8 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
             'title_post'    => isset( $settings['title-post'] ) ? $settings['title-post'] : '%%title%% %%separator%% %%sitename%%',
             'metadesc_post' => isset( $settings['metadesc-post'] ) ? $settings['metadesc-post'] : '',
             'title_page'    => isset( $settings['title-page'] ) ? $settings['title-page'] : '%%title%% %%separator%% %%sitename%%',
-            'metadesc_page' => isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '',
+            'metadesc_page'    => isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '',
+            'default_og_image' => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
         ),
         'favicon'  => get_site_icon_url( 28 ),
         'siteUrl'  => home_url(),
@@ -170,7 +173,8 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
         'title_post'    => 'title-post',
         'metadesc_post' => 'metadesc-post',
         'title_page'    => 'title-page',
-        'metadesc_page' => 'metadesc-page',
+        'metadesc_page'    => 'metadesc-page',
+        'default_og_image' => 'default_og_image',
     );
 
     foreach ( $allowed_keys as $js_key => $wp_key ) {
@@ -331,9 +335,12 @@ add_action( 'wp_head', function () {
         $og_desc = $description;
     }
 
-    // Fallback OG image to featured image.
+    // Fallback OG image to featured image, then default.
     if ( ! $og_image && is_singular() ) {
         $og_image = get_the_post_thumbnail_url( get_queried_object_id(), 'large' );
+    }
+    if ( ! $og_image ) {
+        $og_image = isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '';
     }
 
     if ( $og_title ) {
@@ -409,8 +416,9 @@ add_action( 'enqueue_block_editor_assets', function () {
         'restUrl'  => rest_url( 'snel-seo/v1/post-meta' ),
         'nonce'    => wp_create_nonce( 'wp_rest' ),
         'settings' => array(
-            'website_name' => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
-            'separator'    => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
+            'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
+            'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
+            'default_og_image' => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
         ),
     ) );
 } );

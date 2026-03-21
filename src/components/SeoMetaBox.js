@@ -5,6 +5,7 @@ import { Search, Share2, Settings } from 'lucide-react';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
 import Tabs from './Tabs';
+import SocialPreview from './SocialPreview';
 
 export default function SeoMetaBox() {
     const [ seoTitle, setSeoTitle ] = useState( '' );
@@ -12,13 +13,16 @@ export default function SeoMetaBox() {
     const [ activeTab, setActiveTab ] = useState( 'seo' );
 
     // Get post info from the editor store
-    const { postId, postTitle, permalink, isSaving } = useSelect( ( select ) => {
+    const { postId, postTitle, permalink, isSaving, featuredImageUrl } = useSelect( ( select ) => {
         const editor = select( 'core/editor' );
+        const featuredImageId = editor?.getEditedPostAttribute?.( 'featured_media' );
+        const media = featuredImageId ? select( 'core' )?.getMedia?.( featuredImageId ) : null;
         return {
             postId: editor?.getCurrentPostId?.(),
             postTitle: editor?.getEditedPostAttribute?.( 'title' ) || '',
             permalink: editor?.getPermalink?.() || '',
             isSaving: editor?.isSavingPost?.() || false,
+            featuredImageUrl: media?.source_url || '',
         };
     }, [] );
 
@@ -128,12 +132,12 @@ export default function SeoMetaBox() {
 
             {/* Social Tab */}
             { activeTab === 'social' && (
-                <div className="py-6 text-center">
-                    <Share2 size={ 24 } className="text-gray-300 mx-auto mb-2" />
-                    <p className="text-sm text-gray-400">
-                        { __( 'Social preview & Open Graph overrides coming soon.', 'snel-seo' ) }
-                    </p>
-                </div>
+                <SocialPreview
+                    title={ previewTitle }
+                    description={ metaDesc }
+                    url={ permalink }
+                    imageUrl={ featuredImageUrl || window.snelSeoEditor?.settings?.default_og_image }
+                />
             ) }
 
             {/* Advanced Tab */}

@@ -1,6 +1,6 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Globe, Home, FileText, PenTool, Save } from 'lucide-react';
+import { Globe, Home, FileText, PenTool, Save, Image, X } from 'lucide-react';
 import TemplateInput from '../components/TemplateInput';
 import GooglePreview from '../components/GooglePreview';
 import Tabs from '../components/Tabs';
@@ -147,6 +147,50 @@ export default function Settings() {
                                     </button>
                                 ) ) }
                             </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                { __( 'Default Social Image', 'snel-seo' ) }
+                            </label>
+                            <p className="text-xs text-gray-400 mb-2">
+                                { __( 'Used when a page has no featured image. Recommended: 1200x630px.', 'snel-seo' ) }
+                            </p>
+                            { settings.default_og_image ? (
+                                <div className="relative inline-block">
+                                    <img
+                                        src={ settings.default_og_image }
+                                        alt=""
+                                        className="max-w-[300px] h-auto rounded-lg border border-gray-200"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={ () => update( 'default_og_image', '' ) }
+                                        className="absolute top-2 right-2 w-6 h-6 bg-white rounded-full border border-gray-300 flex items-center justify-center hover:bg-red-50 hover:border-red-300 transition-colors"
+                                    >
+                                        <X size={ 12 } className="text-gray-500" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={ () => {
+                                        const frame = wp.media( {
+                                            title: __( 'Select Default Social Image', 'snel-seo' ),
+                                            multiple: false,
+                                            library: { type: 'image' },
+                                        } );
+                                        frame.on( 'select', () => {
+                                            const attachment = frame.state().get( 'selection' ).first().toJSON();
+                                            update( 'default_og_image', attachment.url );
+                                        } );
+                                        frame.open();
+                                    } }
+                                    className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                                >
+                                    <Image size={ 16 } />
+                                    { __( 'Select Image', 'snel-seo' ) }
+                                </button>
+                            ) }
                         </div>
                     </div>
                 ) }
