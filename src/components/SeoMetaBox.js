@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { Search, Share2, Settings, Sparkles, Languages } from 'lucide-react';
+import { Search, Share2, Settings, Sparkles, Languages, Target } from 'lucide-react';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
@@ -68,6 +68,7 @@ export default function SeoMetaBox() {
         }
     }, [ isSaving ] );
 
+    const updateFocusKw = ( value ) => setFocusKw( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
     const updateTitle = ( value ) => setSeoTitle( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
     const updateDesc = ( value ) => setMetaDesc( ( prev ) => ( { ...prev, [ activeLang ]: value } ) );
 
@@ -288,6 +289,20 @@ export default function SeoMetaBox() {
             {/* SEO Tab */}
             { activeTab === 'seo' && (
                 <div className="space-y-4">
+                    <div>
+                        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-700 mb-1.5">
+                            <Target size={ 14 } className="text-gray-400" />
+                            { __( 'Focus Keyphrase', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                        </label>
+                        <input
+                            type="text"
+                            value={ focusKw[ activeLang ] || '' }
+                            onChange={ ( e ) => updateFocusKw( e.target.value ) }
+                            placeholder={ __( 'e.g. antique oak bookcase', 'snel-seo' ) }
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                    </div>
+
                     <TemplateInput
                         label={ __( 'SEO Title', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
                         value={ currentTitle }
