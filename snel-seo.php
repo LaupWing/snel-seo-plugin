@@ -628,12 +628,12 @@ add_action( 'rest_api_init', function () {
             }
 
             $prompts = array(
-                'title' => "Does the SEO title effectively contain or target the focus keyphrase?\n\nKeyphrase: {$keyphrase}\nSEO Title: {$seo_title}",
-                'description' => "Does the meta description effectively contain or target the focus keyphrase? Is it compelling?\n\nKeyphrase: {$keyphrase}\nMeta Description: {$meta_desc}",
-                'opening' => "Does the opening content (first 2-3 paragraphs) mention or target the focus keyphrase early enough?\n\nKeyphrase: {$keyphrase}\nContent:\n" . mb_substr( $content, 0, 1500 ),
-                'body' => "Is the focus keyphrase used naturally throughout the content? Not too little (underused), not too much (keyword stuffing)?\n\nKeyphrase: {$keyphrase}\nContent:\n" . mb_substr( $content, 0, 3000 ),
-                'url' => "Does the URL/slug contain the focus keyphrase or a relevant variation?\n\nKeyphrase: {$keyphrase}\nURL: {$url}",
-                'overall' => "Overall, how well does this page target the focus keyphrase? Consider title, description, content, and structure.\n\nKeyphrase: {$keyphrase}\nSEO Title: {$seo_title}\nMeta Description: {$meta_desc}\nURL: {$url}\nContent:\n" . mb_substr( $content, 0, 2000 ),
+                'title' => "Check if the SEO title contains the focus keyphrase (exact match or close variation). The keyphrase can appear anywhere in the title. Case-insensitive. Pass if the keyphrase or a very close variation is present.\n\nKeyphrase: {$keyphrase}\nSEO Title: {$seo_title}",
+                'description' => "Check if the meta description contains the focus keyphrase (exact match or close variation). Also assess if the description is compelling and has a call to action. Pass if the keyphrase is present and the description is decent.\n\nKeyphrase: {$keyphrase}\nMeta Description: {$meta_desc}",
+                'opening' => "The content below includes navigation elements (menus, search bars, buttons) — ignore those. Focus on the main body content only. Does the keyphrase appear in the first 2-3 actual content paragraphs (not navigation)?\n\nKeyphrase: {$keyphrase}\nContent:\n" . mb_substr( $content, 0, 1500 ),
+                'body' => "The content below includes navigation elements (menus, search bars, buttons) — ignore those. Focus on main body content only. Count how many times the keyphrase appears in the body content. Pass if it appears 2+ times naturally. Fail if 0-1 times (underused) or 10+ times (keyword stuffing).\n\nKeyphrase: {$keyphrase}\nContent:\n" . mb_substr( $content, 0, 3000 ),
+                'url' => "Check if the URL slug contains the focus keyphrase or a slugified version of it (words separated by hyphens, no special characters). Pass if present, fail if not.\n\nKeyphrase: {$keyphrase}\nURL: {$url}",
+                'overall' => "The content includes navigation elements — ignore those. Give an overall SEO assessment for how well this page targets the focus keyphrase. Consider: Is the keyphrase in the title, description, headings, and body? Is the content relevant to the keyphrase? Any structural improvements needed?\n\nKeyphrase: {$keyphrase}\nSEO Title: {$seo_title}\nMeta Description: {$meta_desc}\nURL: {$url}\nContent:\n" . mb_substr( $content, 0, 2000 ),
             );
 
             if ( ! isset( $prompts[ $check ] ) ) {
@@ -650,7 +650,7 @@ add_action( 'rest_api_init', function () {
                 'body' => wp_json_encode( array(
                     'model'       => $model,
                     'messages'    => array(
-                        array( 'role' => 'system', 'content' => 'You are an SEO expert analyzing a webpage. Respond in JSON format only: { "pass": true/false, "message": "short assessment", "suggestion": "actionable improvement tip or empty string if pass is true" }. Be concise. Write in the same language as the content.' ),
+                        array( 'role' => 'system', 'content' => 'You are an SEO expert analyzing a webpage. ALWAYS respond in English regardless of the content language. Be factual, not subjective. Respond in JSON format only: { "pass": true/false, "message": "short factual assessment (1 sentence)", "suggestion": "specific actionable improvement tip, or empty string if pass is true" }. Be concise.' ),
                         array( 'role' => 'user', 'content' => $prompts[ $check ] ),
                     ),
                     'temperature' => 0.3,

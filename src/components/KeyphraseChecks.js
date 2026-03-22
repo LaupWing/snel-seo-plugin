@@ -285,7 +285,7 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang }
 
     const tabs = [
         { id: 'quick', label: __( 'Quick', 'snel-seo' ), icon: Zap },
-        { id: 'ai', label: __( 'AI', 'snel-seo' ), badge: 'beta' },
+        { id: 'ai', label: __( 'AI Scan', 'snel-seo' ), badge: 'beta' },
     ];
 
     return (
