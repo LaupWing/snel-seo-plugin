@@ -9,6 +9,7 @@ import Tabs from './Tabs';
 import SocialPreview from './SocialPreview';
 
 export default function SeoMetaBox() {
+    const [ focusKw, setFocusKw ] = useState( {} );
     const [ seoTitle, setSeoTitle ] = useState( {} );
     const [ metaDesc, setMetaDesc ] = useState( {} );
     const [ activeTab, setActiveTab ] = useState( 'seo' );
@@ -44,6 +45,7 @@ export default function SeoMetaBox() {
         } )
             .then( ( res ) => res.json() )
             .then( ( data ) => {
+                setFocusKw( data.focus_kw || {} );
                 setSeoTitle( data.seo_title || {} );
                 setMetaDesc( data.metadesc || {} );
             } )
@@ -60,7 +62,7 @@ export default function SeoMetaBox() {
                 fetch( `${ window.snelSeoEditor.restUrl }/${ postId }`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
-                    body: JSON.stringify( { seo_title: seoTitle, metadesc: metaDesc } ),
+                    body: JSON.stringify( { seo_title: seoTitle, metadesc: metaDesc, focus_kw: focusKw } ),
                 } );
             }
         }
