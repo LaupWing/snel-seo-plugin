@@ -1,5 +1,5 @@
 import { useState, useEffect } from '@wordpress/element';
-import { useSelect } from '@wordpress/data';
+import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import { Search, Share2, Settings, Sparkles, Languages, Target } from 'lucide-react';
 import { Tooltip } from '@wordpress/components';
@@ -10,6 +10,7 @@ import SocialPreview from './SocialPreview';
 import KeyphraseChecks from './KeyphraseChecks';
 
 export default function SeoMetaBox() {
+    const { createSuccessNotice, createErrorNotice } = useDispatch( 'core/notices' );
     const [ focusKw, setFocusKw ] = useState( {} );
     const [ seoTitle, setSeoTitle ] = useState( {} );
     const [ metaDesc, setMetaDesc ] = useState( {} );
@@ -95,12 +96,14 @@ export default function SeoMetaBox() {
             if ( data.result ) {
                 if ( type === 'title' ) updateTitle( data.result );
                 else updateDesc( data.result );
+                const label = type === 'title' ? __( 'SEO title', 'snel-seo' ) : __( 'Meta description', 'snel-seo' );
+                createSuccessNotice( `${ label } ${ __( 'generated successfully', 'snel-seo' ) }`, { type: 'snackbar' } );
             } else {
-                const msg = data.message || data.data?.message || 'Generation failed.';
-                alert( `Snel SEO: ${ msg }` );
+                const msg = data.message || data.data?.message || __( 'Generation failed.', 'snel-seo' );
+                createErrorNotice( `Snel SEO: ${ msg }`, { type: 'snackbar' } );
             }
         } catch ( err ) {
-            alert( `Snel SEO: Network error — ${ err.message || 'Could not reach the server.' }` );
+            createErrorNotice( `Snel SEO: ${ err.message || __( 'Could not reach the server.', 'snel-seo' ) }`, { type: 'snackbar' } );
         }
         setLoading( false );
     };
@@ -149,11 +152,11 @@ export default function SeoMetaBox() {
                         setSeoTitle( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
                     } else {
                         const msg = data.message || data.data?.message || 'Title generation failed.';
-                        alert( `Snel SEO (${ lang.label }): ${ msg }` );
+                        createErrorNotice( `Snel SEO (${ lang.label }): ${ msg }`, { type: 'snackbar' } );
                         break;
                     }
                 } catch ( err ) {
-                    alert( `Snel SEO (${ lang.label }): Network error — ${ err.message || 'Could not reach the server.' }` );
+                    createErrorNotice( `Snel SEO (${ lang.label }): ${ err.message || 'Could not reach the server.' }`, { type: 'snackbar' } );
                     break;
                 }
             }
@@ -170,11 +173,11 @@ export default function SeoMetaBox() {
                         setMetaDesc( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
                     } else {
                         const msg = data.message || data.data?.message || 'Description generation failed.';
-                        alert( `Snel SEO (${ lang.label }): ${ msg }` );
+                        createErrorNotice( `Snel SEO (${ lang.label }): ${ msg }`, { type: 'snackbar' } );
                         break;
                     }
                 } catch ( err ) {
-                    alert( `Snel SEO (${ lang.label }): Network error — ${ err.message || 'Could not reach the server.' }` );
+                    createErrorNotice( `Snel SEO (${ lang.label }): ${ err.message || 'Could not reach the server.' }`, { type: 'snackbar' } );
                     break;
                 }
             }
