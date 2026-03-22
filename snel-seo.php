@@ -568,32 +568,23 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
         return new WP_Error( 'no_post', 'Post not found.', array( 'status' => 404 ) );
     }
 
-    // Strip blocks/HTML to get plain text content.
-    // Render blocks to HTML.
-    $html = do_blocks( $post->post_content );
-
-    // Extract only content from data-seo-content sections.
-    $seo_html = '';
-    if ( preg_match_all( '/<[^>]+data-seo-content[^>]*>(.*?)<\/section>/is', $html, $sections ) ) {
-        $seo_html = implode( ' ', $sections[1] );
-    }
-
-    // Fallback to full HTML if no data-seo-content sections found.
-    if ( empty( $seo_html ) ) {
-        $seo_html = $html;
-    }
-
-    // Extract headings and paragraphs from the content.
-    $texts = array();
-    if ( preg_match_all( '/<(?:h[1-6]|p)\b[^>]*>(.+?)<\/(?:h[1-6]|p)>/is', $seo_html, $matches ) ) {
-        foreach ( $matches[1] as $inner ) {
-            $clean = trim( wp_strip_all_tags( $inner ) );
-            if ( $clean && strlen( $clean ) > 3 ) {
-                $texts[] = $clean;
+    // Use content from client if provided (extracted from blocks, language-aware).
+    // Fall back to server-side extraction for backwards compatibility.
+    if ( ! empty( $params['content'] ) ) {
+        $content = sanitize_textarea_field( $params['content'] );
+    } else {
+        $html  = do_blocks( $post->post_content );
+        $texts = array();
+        if ( preg_match_all( '/<(?:h[1-6]|p)\b[^>]*>(.+?)<\/(?:h[1-6]|p)>/is', $html, $matches ) ) {
+            foreach ( $matches[1] as $inner ) {
+                $clean = trim( wp_strip_all_tags( $inner ) );
+                if ( $clean && strlen( $clean ) > 3 ) {
+                    $texts[] = $clean;
+                }
             }
         }
+        $content = implode( "\n", $texts );
     }
-    $content = implode( "\n", $texts );
     $content = mb_substr( $content, 0, 3000 );
     $title   = $post->post_title;
 

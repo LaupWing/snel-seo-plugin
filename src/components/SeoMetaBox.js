@@ -77,22 +77,11 @@ export default function SeoMetaBox() {
     const handleGenerate = async ( type ) => {
         if ( ! postId ) return;
 
-        // Debug: log blocks and extracted content
+        // Extract content from blocks client-side (language-aware)
         const allBlocks = wp.data.select( 'core/block-editor' ).getBlocks();
-        const extractText = ( blocks ) => {
-            const texts = [];
-            for ( const block of blocks ) {
-                if ( block.attributes?.content ) texts.push( block.attributes.content );
-                if ( block.attributes?.heading ) texts.push( block.attributes.heading );
-                if ( block.attributes?.tagline ) texts.push( block.attributes.tagline );
-                if ( block.attributes?.title ) texts.push( block.attributes.title );
-                if ( block.innerBlocks?.length ) texts.push( ...extractText( block.innerBlocks ) );
-            }
-            return texts;
-        };
-        console.log( '[Snel SEO] Raw blocks:', allBlocks );
-        console.log( '[Snel SEO] Extracted texts:', extractText( allBlocks ) );
-        console.log( '[Snel SEO] Block names:', allBlocks.map( ( b ) => b.name ) );
+        const extract = window.awExtractContent;
+        const contentTexts = extract ? extract( allBlocks, activeLang ) : [];
+        const content = contentTexts.join( '\n' );
 
         const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
         setLoading( true );
@@ -100,7 +89,7 @@ export default function SeoMetaBox() {
             const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
-                body: JSON.stringify( { type, lang: activeLang } ),
+                body: JSON.stringify( { type, lang: activeLang, content } ),
             } );
             const data = await res.json();
             if ( data.result ) {
