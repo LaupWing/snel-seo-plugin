@@ -600,6 +600,12 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
                 . "Write in {$lang_name}. Return ONLY the full title with separator and site name, nothing else.\n\n"
                 . "Page title: {$title}\n"
                 . "Page content: {$content}";
+    } elseif ( 'keyphrase' === $type ) {
+        $source_kw = isset( $params['source_keyphrase'] ) ? sanitize_text_field( $params['source_keyphrase'] ) : '';
+        $prompt = "Translate this SEO focus keyphrase to {$lang_name}. "
+                . "Keep it concise (1-4 words). It should be the search term a {$lang_name}-speaking user would type into Google. "
+                . "Return ONLY the translated keyphrase, nothing else.\n\n"
+                . "Keyphrase: {$source_kw}";
     } else {
         $prompt = "Generate an SEO-optimized meta description in {$lang_name} for the following page. "
                 . "Keep it between 120-155 characters. Make it compelling and include a call to action if appropriate. "

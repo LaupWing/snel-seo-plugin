@@ -135,8 +135,9 @@ export default function SeoMetaBox() {
         for ( const lang of otherLangs ) {
             const needsTitle = !! seoTitle[ defaultLang ] || !! seoTitle[ lang.code ];
             const needsDesc = !! metaDesc[ defaultLang ] || !! metaDesc[ lang.code ];
+            const needsKw = !! focusKw[ defaultLang ];
 
-            if ( ! needsTitle && ! needsDesc ) continue;
+            if ( ! needsTitle && ! needsDesc && ! needsKw ) continue;
 
             await animateBtnText( `✦ Translating ${ lang.label }...` );
 
@@ -182,6 +183,27 @@ export default function SeoMetaBox() {
                 }
             }
 
+            if ( needsKw ) {
+                try {
+                    const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
+                        body: JSON.stringify( { type: 'keyphrase', lang: lang.code, source_keyphrase: focusKw[ defaultLang ] } ),
+                    } );
+                    const data = await res.json();
+                    if ( data.result ) {
+                        setFocusKw( ( prev ) => ( { ...prev, [ lang.code ]: data.result } ) );
+                    } else {
+                        const msg = data.message || data.data?.message || 'Keyphrase translation failed.';
+                        createErrorNotice( `Snel SEO (${ lang.label }): ${ msg }`, { type: 'snackbar' } );
+                        break;
+                    }
+                } catch ( err ) {
+                    createErrorNotice( `Snel SEO (${ lang.label }): ${ err.message || 'Could not reach the server.' }`, { type: 'snackbar' } );
+                    break;
+                }
+            }
+
             await animateBtnText( `${ lang.label } ✓` );
             await new Promise( ( r ) => setTimeout( r, 500 ) );
         }
@@ -197,7 +219,7 @@ export default function SeoMetaBox() {
 
     // Count how many languages are missing content
     const missingCount = languages.filter( ( l ) =>
-        l.code !== defaultLang && ( ! seoTitle[ l.code ] || ! metaDesc[ l.code ] )
+        l.code !== defaultLang && ( ! seoTitle[ l.code ] || ! metaDesc[ l.code ] || ( focusKw[ defaultLang ] && ! focusKw[ l.code ] ) )
     ).length;
 
     // Resolve preview
