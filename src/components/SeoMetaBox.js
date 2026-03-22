@@ -78,26 +78,16 @@ export default function SeoMetaBox() {
     const handleGenerate = async ( type ) => {
         if ( ! postId ) return;
 
-        // Test: fetch rendered content from server
+        const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
+        setLoading( true );
         try {
+            // Fetch rendered content from server (language-aware)
             const renderRes = await fetch( `${ window.snelSeoEditor.renderUrl }/${ postId }?lang=${ activeLang }`, {
                 headers: { 'X-WP-Nonce': window.snelSeoEditor.nonce },
             } );
             const renderData = await renderRes.json();
-            console.log( `[Snel SEO] Render endpoint (${ activeLang }):`, renderData );
-        } catch ( e ) {
-            console.error( '[Snel SEO] Render endpoint failed:', e );
-        }
+            const content = renderData.full_text || '';
 
-        // Extract content from blocks client-side (language-aware)
-        const allBlocks = wp.data.select( 'core/block-editor' ).getBlocks();
-        const extract = window.awExtractContent;
-        const contentTexts = extract ? extract( allBlocks, activeLang ) : [];
-        const content = contentTexts.join( '\n' );
-
-        const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
-        setLoading( true );
-        try {
             const res = await fetch( `${ window.snelSeoEditor.generateUrl }/${ postId }`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
