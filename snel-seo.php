@@ -465,6 +465,7 @@ add_action( 'enqueue_block_editor_assets', function () {
     wp_localize_script( 'snel-seo-editor', 'snelSeoEditor', array(
         'restUrl'      => rest_url( 'snel-seo/v1/post-meta' ),
         'generateUrl'  => rest_url( 'snel-seo/v1/generate' ),
+        'renderUrl'    => rest_url( 'snel-seo/v1/render' ),
         'nonce'        => wp_create_nonce( 'wp_rest' ),
         'languages'    => $languages,
         'defaultLang'  => snel_seo_get_default_lang(),
@@ -533,6 +534,69 @@ add_action( 'rest_api_init', function () {
     register_rest_route( 'snel-seo/v1', '/generate/(?P<id>\d+)', array(
         'methods'             => 'POST',
         'callback'            => 'snel_seo_generate_meta',
+        'permission_callback' => function ( $request ) {
+            return current_user_can( 'edit_post', $request['id'] );
+        },
+    ) );
+} );
+
+/**
+ * REST endpoint: Render post content as HTML for a given language.
+ * Returns paragraphs and headings as plain text arrays.
+ */
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'snel-seo/v1', '/render/(?P<id>\d+)', array(
+        'methods'             => 'GET',
+        'callback'            => function ( $request ) {
+            $post_id = (int) $request['id'];
+            $lang    = $request->get_param( 'lang' ) ?: snel_seo_get_default_lang();
+
+            $post = get_post( $post_id );
+            if ( ! $post ) {
+                return new WP_Error( 'no_post', 'Post not found.', array( 'status' => 404 ) );
+            }
+
+            // Set the language for rendering.
+            if ( class_exists( 'LocaleManager' ) ) {
+                LocaleManager::setOverride( $lang );
+            }
+            add_filter( 'snel_seo_current_language', function () use ( $lang ) {
+                return $lang;
+            }, 999 );
+
+            // Render blocks to HTML.
+            $html = do_blocks( $post->post_content );
+
+            // Reset the override.
+            if ( class_exists( 'LocaleManager' ) ) {
+                LocaleManager::setOverride( null );
+            }
+
+            // Extract headings.
+            $headings = array();
+            if ( preg_match_all( '/<h[1-6]\b[^>]*>(.+?)<\/h[1-6]>/is', $html, $matches ) ) {
+                foreach ( $matches[1] as $inner ) {
+                    $clean = trim( wp_strip_all_tags( $inner ) );
+                    if ( $clean ) $headings[] = $clean;
+                }
+            }
+
+            // Extract paragraphs.
+            $paragraphs = array();
+            if ( preg_match_all( '/<p\b[^>]*>(.+?)<\/p>/is', $html, $matches ) ) {
+                foreach ( $matches[1] as $inner ) {
+                    $clean = trim( wp_strip_all_tags( $inner ) );
+                    if ( $clean && strlen( $clean ) > 3 ) $paragraphs[] = $clean;
+                }
+            }
+
+            return rest_ensure_response( array(
+                'lang'       => $lang,
+                'headings'   => $headings,
+                'paragraphs' => $paragraphs,
+                'full_text'  => implode( "\n", array_merge( $headings, $paragraphs ) ),
+            ) );
+        },
         'permission_callback' => function ( $request ) {
             return current_user_can( 'edit_post', $request['id'] );
         },

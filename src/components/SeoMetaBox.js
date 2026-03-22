@@ -78,6 +78,17 @@ export default function SeoMetaBox() {
     const handleGenerate = async ( type ) => {
         if ( ! postId ) return;
 
+        // Test: fetch rendered content from server
+        try {
+            const renderRes = await fetch( `${ window.snelSeoEditor.renderUrl }/${ postId }?lang=${ activeLang }`, {
+                headers: { 'X-WP-Nonce': window.snelSeoEditor.nonce },
+            } );
+            const renderData = await renderRes.json();
+            console.log( `[Snel SEO] Render endpoint (${ activeLang }):`, renderData );
+        } catch ( e ) {
+            console.error( '[Snel SEO] Render endpoint failed:', e );
+        }
+
         // Extract content from blocks client-side (language-aware)
         const allBlocks = wp.data.select( 'core/block-editor' ).getBlocks();
         const extract = window.awExtractContent;
