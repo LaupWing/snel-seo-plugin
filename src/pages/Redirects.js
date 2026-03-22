@@ -1,7 +1,131 @@
+import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { ArrowRightLeft, Plus } from 'lucide-react';
+import { Modal, SelectControl } from '@wordpress/components';
+import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 
 export default function Redirects() {
+    const [ redirects, setRedirects ] = useState( [] );
+    const [ loading, setLoading ] = useState( true );
+    const [ showModal, setShowModal ] = useState( false );
+    const [ sourceUrl, setSourceUrl ] = useState( '' );
+    const [ targetUrl, setTargetUrl ] = useState( '' );
+    const [ redirectType, setRedirectType ] = useState( '301' );
+    const [ saving, setSaving ] = useState( false );
+    const [ editingId, setEditingId ] = useState( null );
+
+    const fetchRedirects = async () => {
+        try {
+            const res = await fetch( `${ window.snelSeo.restUrl }/redirects`, {
+                headers: { 'X-WP-Nonce': window.snelSeo.nonce },
+            } );
+            const data = await res.json();
+            setRedirects( Array.isArray( data ) ? data : [] );
+        } catch ( e ) { /* ignore */ }
+        setLoading( false );
+    };
+
+    useEffect( () => { fetchRedirects(); }, [] );
+
+    const handleSave = async () => {
+        if ( ! sourceUrl || ! targetUrl ) return;
+        setSaving( true );
+        try {
+            if ( editingId ) {
+                await fetch( `${ window.snelSeo.restUrl }/redirects/${ editingId }`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                    body: JSON.stringify( { source_url: sourceUrl, target_url: targetUrl, type: parseInt( redirectType ) } ),
+                } );
+            } else {
+                await fetch( `${ window.snelSeo.restUrl }/redirects`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                    body: JSON.stringify( { source_url: sourceUrl, target_url: targetUrl, type: parseInt( redirectType ) } ),
+                } );
+            }
+            setShowModal( false );
+            setEditingId( null );
+            setSourceUrl( '' );
+            setTargetUrl( '' );
+            setRedirectType( '301' );
+            await fetchRedirects();
+        } catch ( e ) { /* ignore */ }
+        setSaving( false );
+    };
+
+    const openEdit = ( r ) => {
+        setEditingId( r.id );
+        setSourceUrl( r.source_url );
+        setTargetUrl( r.target_url );
+        setRedirectType( String( r.type ) );
+        setShowModal( true );
+    };
+
+    const openAdd = () => {
+        setEditingId( null );
+        setSourceUrl( '' );
+        setTargetUrl( '' );
+        setRedirectType( '301' );
+        setShowModal( true );
+    };
+
+    const handleDelete = async ( id ) => {
+        try {
+            await fetch( `${ window.snelSeo.restUrl }/redirects/${ id }`, {
+                method: 'DELETE',
+                headers: { 'X-WP-Nonce': window.snelSeo.nonce },
+            } );
+            setRedirects( ( prev ) => prev.filter( ( r ) => r.id !== id ) );
+        } catch ( e ) { /* ignore */ }
+    };
+
+    const [ importing, setImporting ] = useState( false );
+    const [ importResult, setImportResult ] = useState( null );
+    const [ searchQuery, setSearchQuery ] = useState( '' );
+    const [ currentPage, setCurrentPage ] = useState( 1 );
+    const perPage = 20;
+
+    // Filter and paginate
+    const filtered = redirects.filter( ( r ) =>
+        ! searchQuery || r.source_url.toLowerCase().includes( searchQuery.toLowerCase() ) || r.target_url.toLowerCase().includes( searchQuery.toLowerCase() )
+    );
+    const totalPages = Math.ceil( filtered.length / perPage );
+    const paginated = filtered.slice( ( currentPage - 1 ) * perPage, currentPage * perPage );
+
+    const handleImport = async ( e ) => {
+        const file = e.target.files?.[ 0 ];
+        if ( ! file ) return;
+        setImporting( true );
+        setImportResult( null );
+        try {
+            const text = await file.text();
+            const data = JSON.parse( text );
+            const res = await fetch( `${ window.snelSeo.restUrl }/redirects/import`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                body: JSON.stringify( data ),
+            } );
+            const result = await res.json();
+            setImportResult( result );
+            await fetchRedirects();
+        } catch ( err ) {
+            setImportResult( { error: err.message } );
+        }
+        setImporting( false );
+        e.target.value = '';
+    };
+
+    const handleClearAll = async () => {
+        if ( ! confirm( __( 'Delete ALL redirects? This cannot be undone.', 'snel-seo' ) ) ) return;
+        try {
+            await fetch( `${ window.snelSeo.restUrl }/redirects/all`, {
+                method: 'DELETE',
+                headers: { 'X-WP-Nonce': window.snelSeo.nonce },
+            } );
+            setRedirects( [] );
+        } catch ( e ) { /* ignore */ }
+    };
+
     return (
         <div className="p-6">
             {/* Header */}
@@ -11,27 +135,242 @@ export default function Redirects() {
                         { __( 'Redirects', 'snel-seo' ) }
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        { __( 'Manage 301 redirects. Automatically suggested when pages are deleted or moved.', 'snel-seo' ) }
+                        { __( 'Manage 301 redirects. Protect SEO when pages move or are deleted.', 'snel-seo' ) }
                     </p>
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
-                    <Plus size={ 16 } />
-                    { __( 'Add Redirect', 'snel-seo' ) }
-                </button>
+                <div className="flex items-center gap-2">
+                    { redirects.length > 0 && (
+                        <button
+                            onClick={ handleClearAll }
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                            <Trash size={ 14 } />
+                            { __( 'Clear All', 'snel-seo' ) }
+                        </button>
+                    ) }
+                    <label className={ `flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${ importing ? 'opacity-50 pointer-events-none' : '' }` }>
+                        { importing ? <Loader2 size={ 14 } className="animate-spin" /> : <Upload size={ 14 } /> }
+                        { importing ? __( 'Importing...', 'snel-seo' ) : __( 'Import JSON', 'snel-seo' ) }
+                        <input type="file" accept=".json" onChange={ handleImport } className="hidden" />
+                    </label>
+                    <button
+                        onClick={ openAdd }
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        <Plus size={ 16 } />
+                        { __( 'Add Redirect', 'snel-seo' ) }
+                    </button>
+                </div>
             </div>
 
-            {/* Empty state */}
-            <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <ArrowRightLeft size={ 20 } className="text-gray-400" />
+            {/* Import result */}
+            { importResult && (
+                <div className={ `mb-4 px-4 py-3 rounded-lg text-sm ${ importResult.error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700' }` }>
+                    { importResult.error
+                        ? `Import failed: ${ importResult.error }`
+                        : `Imported ${ importResult.imported } redirects (${ importResult.skipped } skipped, ${ importResult.total } total in file)`
+                    }
+                    <button onClick={ () => setImportResult( null ) } className="ml-2 underline">dismiss</button>
                 </div>
-                <h2 className="text-sm font-semibold text-gray-900 mb-1">
-                    { __( 'No redirects yet', 'snel-seo' ) }
-                </h2>
-                <p className="text-sm text-gray-500">
-                    { __( 'Redirects will appear here when you add them or when pages are deleted.', 'snel-seo' ) }
-                </p>
-            </div>
+            ) }
+
+            {/* Search bar */}
+            { ! loading && redirects.length > 0 && (
+                <div className="mb-4 relative">
+                    <Search size={ 14 } className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                        type="text"
+                        value={ searchQuery }
+                        onChange={ ( e ) => { setSearchQuery( e.target.value ); setCurrentPage( 1 ); } }
+                        placeholder={ __( 'Search redirects...', 'snel-seo' ) }
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
+                    />
+                    { searchQuery && (
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                            { filtered.length } { __( 'results', 'snel-seo' ) }
+                        </span>
+                    ) }
+                </div>
+            ) }
+
+            {/* Loading */}
+            { loading && (
+                <div className="flex items-center gap-2 py-8 justify-center text-sm text-gray-400">
+                    <Loader2 size={ 14 } className="animate-spin" />
+                    { __( 'Loading...', 'snel-seo' ) }
+                </div>
+            ) }
+
+            {/* Empty state */}
+            { ! loading && redirects.length === 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg p-12 text-center">
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <ArrowRightLeft size={ 20 } className="text-gray-400" />
+                    </div>
+                    <h2 className="text-sm font-semibold text-gray-900 mb-1">
+                        { __( 'No redirects yet', 'snel-seo' ) }
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                        { __( 'Click "Add Redirect" to create your first redirect.', 'snel-seo' ) }
+                    </p>
+                </div>
+            ) }
+
+            {/* Table */}
+            { ! loading && filtered.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="border-b border-gray-200 bg-gray-50">
+                                <th className="text-left px-4 py-3 font-medium text-gray-600">
+                                    { __( 'Source', 'snel-seo' ) }
+                                </th>
+                                <th className="w-8" />
+                                <th className="text-left px-4 py-3 font-medium text-gray-600">
+                                    { __( 'Target', 'snel-seo' ) }
+                                </th>
+                                <th className="text-center px-4 py-3 font-medium text-gray-600 w-16">
+                                    { __( 'Type', 'snel-seo' ) }
+                                </th>
+                                <th className="text-center px-4 py-3 font-medium text-gray-600 w-16">
+                                    { __( 'Hits', 'snel-seo' ) }
+                                </th>
+                                <th className="w-12" />
+                            </tr>
+                        </thead>
+                        <tbody>
+                            { paginated.map( ( r ) => (
+                                <tr key={ r.id } className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="px-4 py-3 font-mono text-xs text-gray-700 break-all">
+                                        { r.source_url }
+                                    </td>
+                                    <td className="text-center">
+                                        <ArrowRight size={ 14 } className="text-gray-300" />
+                                    </td>
+                                    <td className="px-4 py-3 font-mono text-xs text-blue-600 break-all">
+                                        { r.target_url }
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                            { r.type }
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-center text-xs text-gray-500">
+                                        { r.hits }
+                                    </td>
+                                    <td className="px-4 py-3 text-center">
+                                        <div className="flex items-center gap-1 justify-center">
+                                            <button
+                                                onClick={ () => openEdit( r ) }
+                                                className="p-1 text-gray-400 hover:text-blue-500 transition-colors rounded hover:bg-blue-50"
+                                            >
+                                                <Pencil size={ 14 } />
+                                            </button>
+                                            <button
+                                                onClick={ () => handleDelete( r.id ) }
+                                                className="p-1 text-gray-400 hover:text-red-500 transition-colors rounded hover:bg-red-50"
+                                            >
+                                                <Trash2 size={ 14 } />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) ) }
+                        </tbody>
+                    </table>
+
+                    {/* Pagination */}
+                    { totalPages > 1 && (
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+                            <span className="text-xs text-gray-500">
+                                { __( 'Showing', 'snel-seo' ) } { ( currentPage - 1 ) * perPage + 1 }–{ Math.min( currentPage * perPage, filtered.length ) } { __( 'of', 'snel-seo' ) } { filtered.length }
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={ () => setCurrentPage( ( p ) => Math.max( 1, p - 1 ) ) }
+                                    disabled={ currentPage === 1 }
+                                    className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronLeft size={ 14 } />
+                                </button>
+                                <span className="text-xs text-gray-600 px-2">
+                                    { currentPage } / { totalPages }
+                                </span>
+                                <button
+                                    onClick={ () => setCurrentPage( ( p ) => Math.min( totalPages, p + 1 ) ) }
+                                    disabled={ currentPage === totalPages }
+                                    className="p-1.5 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronRight size={ 14 } />
+                                </button>
+                            </div>
+                        </div>
+                    ) }
+                </div>
+            ) }
+
+            {/* Add Redirect Modal */}
+            { showModal && (
+                <Modal
+                    title={ editingId ? __( 'Edit Redirect', 'snel-seo' ) : __( 'Add Redirect', 'snel-seo' ) }
+                    onRequestClose={ () => { setShowModal( false ); setEditingId( null ); } }
+                >
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                { __( 'Source URL (old path)', 'snel-seo' ) }
+                            </label>
+                            <input
+                                type="text"
+                                value={ sourceUrl }
+                                onChange={ ( e ) => setSourceUrl( e.target.value ) }
+                                placeholder="/old-page-slug"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                { __( 'Target URL (new destination)', 'snel-seo' ) }
+                            </label>
+                            <input
+                                type="text"
+                                value={ targetUrl }
+                                onChange={ ( e ) => setTargetUrl( e.target.value ) }
+                                placeholder="https://example.com/new-page"
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
+                            />
+                        </div>
+                        <div>
+                            <SelectControl
+                                label={ __( 'Redirect Type', 'snel-seo' ) }
+                                value={ redirectType }
+                                options={ [
+                                    { label: '301 — Permanent', value: '301' },
+                                    { label: '302 — Temporary', value: '302' },
+                                ] }
+                                onChange={ setRedirectType }
+                                __nextHasNoMarginBottom
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-2">
+                            <button
+                                onClick={ () => { setShowModal( false ); setEditingId( null ); } }
+                                className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                { __( 'Cancel', 'snel-seo' ) }
+                            </button>
+                            <button
+                                onClick={ handleSave }
+                                disabled={ saving || ! sourceUrl || ! targetUrl }
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                { saving && <Loader2 size={ 14 } className="animate-spin" /> }
+                                { editingId ? __( 'Save Changes', 'snel-seo' ) : __( 'Add Redirect', 'snel-seo' ) }
+                            </button>
+                        </div>
+                    </div>
+                </Modal>
+            ) }
         </div>
     );
 }
