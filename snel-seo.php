@@ -578,7 +578,7 @@ add_action( 'rest_api_init', function () {
             $headings = array();
             if ( preg_match_all( '/<h[1-6]\b[^>]*>(.+?)<\/h[1-6]>/is', $html, $matches ) ) {
                 foreach ( $matches[1] as $inner ) {
-                    $clean = trim( wp_strip_all_tags( $inner ) );
+                    $clean = trim( html_entity_decode( wp_strip_all_tags( $inner ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
                     if ( $clean ) $headings[] = $clean;
                 }
             }
@@ -587,7 +587,7 @@ add_action( 'rest_api_init', function () {
             $paragraphs = array();
             if ( preg_match_all( '/<p\b[^>]*>(.+?)<\/p>/is', $html, $matches ) ) {
                 foreach ( $matches[1] as $inner ) {
-                    $clean = trim( wp_strip_all_tags( $inner ) );
+                    $clean = trim( html_entity_decode( wp_strip_all_tags( $inner ), ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
                     if ( $clean && strlen( $clean ) > 3 ) $paragraphs[] = $clean;
                 }
             }
@@ -854,6 +854,14 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
 
     // Remove wrapping quotes if present.
     $result = trim( $result, '"\'' );
+
+    // Decode unicode escapes (e.g. \u2013 → –) that OpenAI sometimes returns.
+    $result = preg_replace_callback( '/\\\\u([0-9a-fA-F]{4})/', function ( $m ) {
+        return mb_convert_encoding( pack( 'H*', $m[1] ), 'UTF-8', 'UCS-2BE' );
+    }, $result );
+
+    // Decode HTML entities.
+    $result = html_entity_decode( $result, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
     return rest_ensure_response( array( 'result' => $result ) );
 }
