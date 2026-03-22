@@ -356,7 +356,7 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang, 
     const tabs = [
         { id: 'quick', label: __( 'Quick', 'snel-seo' ), icon: Zap, needsKeyphrase: true },
         { id: 'ai', label: __( 'AI Scan', 'snel-seo' ), icon: Search, badge: 'beta', needsKeyphrase: true },
-        { id: 'suggest', label: __( 'Suggest', 'snel-seo' ), icon: Lightbulb },
+        { id: 'suggest', label: __( 'Suggest', 'snel-seo' ), icon: Lightbulb, disabled: true },
     ];
 
     return (
@@ -364,7 +364,7 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang, 
             {/* Tabs */}
             <div className="flex items-center gap-1 mb-3 border-b border-gray-200 pb-2">
                 { tabs.map( ( tab ) => {
-                    const disabled = tab.needsKeyphrase && ! keyphrase;
+                    const disabled = tab.disabled || ( tab.needsKeyphrase && ! keyphrase );
                     return (
                     <button
                         key={ tab.id }
