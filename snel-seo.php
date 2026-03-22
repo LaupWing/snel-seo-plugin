@@ -405,6 +405,126 @@ add_action( 'wp_head', function () {
     printf( '<meta property="og:site_name" content="%s" />' . "\n", esc_attr( $vars['sitename'] ) );
 }, 1 );
 
+// ─── JSON-LD Structured Data ─────────────────────────────────────────────────
+
+/**
+ * Output JSON-LD structured data in <head>.
+ */
+add_action( 'wp_head', function () {
+    $settings  = get_option( 'wpseo_titles', array() );
+    $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
+    $site_url  = home_url( '/' );
+    $og_image  = isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '';
+
+    // ── Organization (every page) ──
+    $org = array(
+        '@context' => 'https://schema.org',
+        '@type'    => 'Organization',
+        'name'     => $site_name,
+        'url'      => $site_url,
+    );
+    if ( $og_image ) {
+        $org['logo'] = $og_image;
+    }
+    printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $org, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+
+    // ── BreadcrumbList (singular pages) ──
+    if ( is_singular() ) {
+        $post_id = get_queried_object_id();
+        $items   = array();
+        $pos     = 1;
+
+        // Home.
+        $items[] = array(
+            '@type'    => 'ListItem',
+            'position' => $pos++,
+            'name'     => $site_name,
+            'item'     => $site_url,
+        );
+
+        // Taxonomy (for products).
+        if ( is_singular( 'product' ) ) {
+            $terms = get_the_terms( $post_id, 'product_category' );
+            if ( $terms && ! is_wp_error( $terms ) ) {
+                $term    = $terms[0];
+                $items[] = array(
+                    '@type'    => 'ListItem',
+                    'position' => $pos++,
+                    'name'     => $term->name,
+                    'item'     => get_term_link( $term ),
+                );
+            }
+        }
+
+        // Current page.
+        $items[] = array(
+            '@type'    => 'ListItem',
+            'position' => $pos,
+            'name'     => get_the_title( $post_id ),
+            'item'     => get_permalink( $post_id ),
+        );
+
+        $breadcrumb = array(
+            '@context'        => 'https://schema.org',
+            '@type'           => 'BreadcrumbList',
+            'itemListElement' => $items,
+        );
+        printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+    }
+
+    // ── Product (product pages) ──
+    if ( is_singular( 'product' ) ) {
+        $post_id = get_queried_object_id();
+        $lang    = snel_seo_get_current_lang();
+        $default = snel_seo_get_default_lang();
+
+        // Name — use post title.
+        $name = get_the_title( $post_id );
+
+        // Description.
+        $desc_raw = get_post_meta( $post_id, '_product_short_description', true );
+        $desc     = '';
+        if ( $desc_raw ) {
+            $descs = is_array( $desc_raw ) ? $desc_raw : json_decode( $desc_raw, true );
+            if ( is_array( $descs ) ) {
+                $desc = ! empty( $descs[ $lang ] ) ? $descs[ $lang ] : ( ! empty( $descs[ $default ] ) ? $descs[ $default ] : '' );
+            } elseif ( is_string( $desc_raw ) ) {
+                $desc = $desc_raw;
+            }
+        }
+
+        // Image.
+        $image = get_the_post_thumbnail_url( $post_id, 'large' );
+
+        // Price.
+        $price_raw = get_post_meta( $post_id, '_price', true );
+        $price     = $price_raw ? preg_replace( '/[^0-9.,]/', '', $price_raw ) : '';
+
+        $product = array(
+            '@context'    => 'https://schema.org',
+            '@type'       => 'Product',
+            'name'        => $name,
+            'url'         => get_permalink( $post_id ),
+        );
+        if ( $desc ) {
+            $product['description'] = wp_strip_all_tags( $desc );
+        }
+        if ( $image ) {
+            $product['image'] = $image;
+        }
+        if ( $price ) {
+            $product['offers'] = array(
+                '@type'         => 'Offer',
+                'price'         => str_replace( ',', '.', $price ),
+                'priceCurrency' => 'EUR',
+                'availability'  => 'https://schema.org/InStock',
+            );
+        }
+
+        printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $product, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+    }
+}, 2 );
+
 // ─── Editor Meta Box ─────────────────────────────────────────────────────────
 
 /**
