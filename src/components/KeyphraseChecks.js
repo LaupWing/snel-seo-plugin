@@ -1,112 +1,182 @@
-import { useMemo } from '@wordpress/element';
+import { useState } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ScanSearch } from 'lucide-react';
 
-/**
- * Check if keyphrase appears in text (case-insensitive).
- */
-function contains( text, keyphrase ) {
-    if ( ! text || ! keyphrase ) return false;
-    return text.toLowerCase().includes( keyphrase.toLowerCase() );
-}
+const CHECKS = [
+    { id: 'title', label: 'Keyphrase in SEO title' },
+    { id: 'description', label: 'Keyphrase in meta description' },
+    { id: 'opening', label: 'Keyphrase in opening content' },
+    { id: 'body', label: 'Keyphrase usage in content' },
+    { id: 'url', label: 'Keyphrase in URL' },
+    { id: 'overall', label: 'Overall SEO assessment' },
+];
 
 export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang } ) {
-    const { permalink, blocks } = useSelect( ( select ) => {
+    const [ results, setResults ] = useState( {} );
+    const [ scanning, setScanning ] = useState( false );
+    const [ activeCheck, setActiveCheck ] = useState( null );
+
+    const { postId, permalink } = useSelect( ( select ) => {
         const editor = select( 'core/editor' );
-        const blockEditor = select( 'core/block-editor' );
         return {
+            postId: editor?.getCurrentPostId?.(),
             permalink: editor?.getPermalink?.() || '',
-            blocks: blockEditor?.getBlocks?.() || [],
         };
     }, [] );
 
-    const checks = useMemo( () => {
-        if ( ! keyphrase ) return [];
+    const handleScan = async () => {
+        if ( ! postId || ! keyphrase || scanning ) return;
+        setScanning( true );
+        setResults( {} );
 
-        const kw = keyphrase.toLowerCase();
-        const escapedKw = kw.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' );
+        // Fetch rendered content first
+        let content = '';
+        try {
+            const renderRes = await fetch( `${ window.snelSeoEditor.renderUrl }/${ postId }?lang=${ lang }`, {
+                headers: { 'X-WP-Nonce': window.snelSeoEditor.nonce },
+            } );
+            const renderData = await renderRes.json();
+            content = renderData.full_text || '';
+        } catch ( e ) {
+            setScanning( false );
+            return;
+        }
 
-        // Use shared extractor from theme (language-aware)
-        const extract = window.awExtractContent;
-        const allContent = extract ? extract( blocks, lang || 'nl' ) : [];
-        const fullText = allContent.join( ' ' );
-        const firstParagraph = allContent[ 0 ] || '';
+        // Run each check one by one
+        for ( const check of CHECKS ) {
+            setActiveCheck( check.id );
 
-        // For headings check, we look at content that likely came from heading attributes
-        const hasInHeading = allContent.some( ( text ) => contains( text, keyphrase ) );
+            try {
+                const res = await fetch( `${ window.snelSeoEditor.analyzeUrl }/${ postId }`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
+                    body: JSON.stringify( {
+                        check: check.id,
+                        keyphrase,
+                        seo_title: seoTitle,
+                        meta_desc: metaDesc,
+                        content,
+                        url: permalink,
+                        lang,
+                    } ),
+                } );
+                const data = await res.json();
+                setResults( ( prev ) => ( { ...prev, [ check.id ]: data } ) );
+            } catch ( err ) {
+                setResults( ( prev ) => ( {
+                    ...prev,
+                    [ check.id ]: { pass: false, message: 'Analysis failed', suggestion: '' },
+                } ) );
+            }
 
-        // Count occurrences in body
-        const bodyCount = ( fullText.toLowerCase().match( new RegExp( escapedKw, 'g' ) ) || [] ).length;
+            // Small delay between checks for animation effect
+            await new Promise( ( r ) => setTimeout( r, 200 ) );
+        }
 
-        // Slug from permalink
-        const slug = decodeURIComponent( permalink ).toLowerCase();
-
-        return [
-            {
-                id: 'title',
-                pass: contains( seoTitle, keyphrase ),
-                good: __( 'Keyphrase found in SEO title', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in SEO title', 'snel-seo' ),
-            },
-            {
-                id: 'description',
-                pass: contains( metaDesc, keyphrase ),
-                good: __( 'Keyphrase found in meta description', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in meta description', 'snel-seo' ),
-            },
-            {
-                id: 'first-content',
-                pass: contains( firstParagraph, keyphrase ),
-                good: __( 'Keyphrase found in the opening content', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in the opening content', 'snel-seo' ),
-            },
-            {
-                id: 'body',
-                pass: bodyCount >= 2,
-                good: `${ __( 'Keyphrase appears', 'snel-seo' ) } ${ bodyCount }x ${ __( 'in the content', 'snel-seo' ) }`,
-                bad: bodyCount === 1
-                    ? __( 'Keyphrase appears only once in the content — try using it a bit more', 'snel-seo' )
-                    : __( 'Keyphrase not found in the content', 'snel-seo' ),
-            },
-            {
-                id: 'slug',
-                pass: contains( slug, keyphrase.replace( /\s+/g, '-' ) ),
-                good: __( 'Keyphrase found in URL', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in URL', 'snel-seo' ),
-            },
-        ];
-    }, [ keyphrase, seoTitle, metaDesc, permalink, blocks, lang ] );
+        setActiveCheck( null );
+        setScanning( false );
+    };
 
     if ( ! keyphrase ) return null;
 
-    const passCount = checks.filter( ( c ) => c.pass ).length;
+    const completedChecks = Object.keys( results ).length;
+    const passCount = Object.values( results ).filter( ( r ) => r.pass ).length;
+    const hasResults = completedChecks > 0;
 
     return (
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-gray-600">
-                    { __( 'SEO Analysis', 'snel-seo' ) }
-                </span>
-                <span className={ `text-xs font-medium px-2 py-0.5 rounded-full ${
-                    passCount === checks.length ? 'bg-emerald-100 text-emerald-700'
-                        : passCount >= checks.length / 2 ? 'bg-amber-100 text-amber-700'
-                            : 'bg-red-100 text-red-700'
-                }` }>
-                    { passCount }/{ checks.length }
-                </span>
-            </div>
-            <ul className="space-y-1.5">
-                { checks.map( ( check ) => (
-                    <li key={ check.id } className="flex items-start gap-2 text-xs text-gray-600">
-                        { check.pass
-                            ? <CheckCircle size={ 14 } className="text-emerald-500 mt-0.5 shrink-0" />
-                            : <XCircle size={ 14 } className="text-red-400 mt-0.5 shrink-0" />
-                        }
-                        <span>{ check.pass ? check.good : check.bad }</span>
-                    </li>
-                ) ) }
-            </ul>
+        <div className="mt-3">
+            {/* Scan button */}
+            <button
+                type="button"
+                onClick={ handleScan }
+                disabled={ scanning }
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+                { scanning ? (
+                    <>
+                        <Loader2 size={ 14 } className="animate-spin" />
+                        { __( 'Analyzing...', 'snel-seo' ) }
+                    </>
+                ) : (
+                    <>
+                        <ScanSearch size={ 14 } />
+                        { hasResults ? __( 'Re-scan SEO', 'snel-seo' ) : __( 'Scan SEO', 'snel-seo' ) }
+                    </>
+                ) }
+            </button>
+
+            {/* Results */}
+            { ( hasResults || scanning ) && (
+                <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                    { hasResults && ! scanning && (
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs font-semibold text-gray-600">
+                                { __( 'SEO Analysis', 'snel-seo' ) }
+                            </span>
+                            <span className={ `text-xs font-medium px-2 py-0.5 rounded-full ${
+                                passCount === CHECKS.length ? 'bg-emerald-100 text-emerald-700'
+                                    : passCount >= CHECKS.length / 2 ? 'bg-amber-100 text-amber-700'
+                                        : 'bg-red-100 text-red-700'
+                            }` }>
+                                { passCount }/{ CHECKS.length }
+                            </span>
+                        </div>
+                    ) }
+
+                    <ul className="space-y-2.5">
+                        { CHECKS.map( ( check ) => {
+                            const result = results[ check.id ];
+                            const isActive = activeCheck === check.id;
+                            const isPending = scanning && ! result && ! isActive;
+
+                            return (
+                                <li
+                                    key={ check.id }
+                                    className={ `transition-all duration-300 ${ result ? 'opacity-100 translate-y-0' : isActive ? 'opacity-100' : isPending ? 'opacity-30' : 'opacity-0 h-0 overflow-hidden' }` }
+                                >
+                                    <div className="flex items-start gap-2 text-xs">
+                                        { isActive && (
+                                            <Loader2 size={ 14 } className="text-blue-500 mt-0.5 shrink-0 animate-spin" />
+                                        ) }
+                                        { result && result.pass && (
+                                            <CheckCircle size={ 14 } className="text-emerald-500 mt-0.5 shrink-0" />
+                                        ) }
+                                        { result && ! result.pass && (
+                                            <XCircle size={ 14 } className="text-red-400 mt-0.5 shrink-0" />
+                                        ) }
+                                        { isPending && (
+                                            <div className="w-3.5 h-3.5 rounded-full bg-gray-200 mt-0.5 shrink-0" />
+                                        ) }
+                                        <div className="flex-1 min-w-0">
+                                            { isActive && (
+                                                <span className="text-blue-600 font-medium">
+                                                    { __( 'Checking', 'snel-seo' ) }: { check.label }...
+                                                </span>
+                                            ) }
+                                            { result && (
+                                                <>
+                                                    <span className={ `font-medium ${ result.pass ? 'text-gray-700' : 'text-gray-700' }` }>
+                                                        { result.message }
+                                                    </span>
+                                                    { result.suggestion && (
+                                                        <p className="mt-1 text-gray-500 leading-relaxed">
+                                                            { result.suggestion }
+                                                        </p>
+                                                    ) }
+                                                </>
+                                            ) }
+                                            { isPending && (
+                                                <span className="text-gray-400">{ check.label }</span>
+                                            ) }
+                                        </div>
+                                    </div>
+                                </li>
+                            );
+                        } ) }
+                    </ul>
+                </div>
+            ) }
         </div>
     );
 }

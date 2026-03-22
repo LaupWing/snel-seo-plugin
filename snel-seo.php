@@ -466,6 +466,7 @@ add_action( 'enqueue_block_editor_assets', function () {
         'restUrl'      => rest_url( 'snel-seo/v1/post-meta' ),
         'generateUrl'  => rest_url( 'snel-seo/v1/generate' ),
         'renderUrl'    => rest_url( 'snel-seo/v1/render' ),
+        'analyzeUrl'   => rest_url( 'snel-seo/v1/analyze' ),
         'nonce'        => wp_create_nonce( 'wp_rest' ),
         'languages'    => $languages,
         'defaultLang'  => snel_seo_get_default_lang(),
@@ -595,6 +596,85 @@ add_action( 'rest_api_init', function () {
                 'headings'   => $headings,
                 'paragraphs' => $paragraphs,
                 'full_text'  => implode( "\n", array_merge( $headings, $paragraphs ) ),
+            ) );
+        },
+        'permission_callback' => function ( $request ) {
+            return current_user_can( 'edit_post', $request['id'] );
+        },
+    ) );
+} );
+
+/**
+ * REST endpoint: AI-powered SEO analysis for a single check.
+ * Returns structured JSON: { pass: bool, message: string, suggestion: string }
+ */
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'snel-seo/v1', '/analyze/(?P<id>\d+)', array(
+        'methods'             => 'POST',
+        'callback'            => function ( $request ) {
+            $post_id = (int) $request['id'];
+            $params  = $request->get_json_params();
+            $check   = isset( $params['check'] ) ? $params['check'] : '';
+            $keyphrase = isset( $params['keyphrase'] ) ? sanitize_text_field( $params['keyphrase'] ) : '';
+            $seo_title = isset( $params['seo_title'] ) ? sanitize_text_field( $params['seo_title'] ) : '';
+            $meta_desc = isset( $params['meta_desc'] ) ? sanitize_text_field( $params['meta_desc'] ) : '';
+            $content   = isset( $params['content'] ) ? sanitize_textarea_field( $params['content'] ) : '';
+            $url       = isset( $params['url'] ) ? esc_url_raw( $params['url'] ) : '';
+            $lang      = isset( $params['lang'] ) ? sanitize_text_field( $params['lang'] ) : 'nl';
+
+            $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+            if ( empty( $api_key ) ) {
+                return new WP_Error( 'no_api_key', 'OpenAI API key not configured.', array( 'status' => 400 ) );
+            }
+
+            $prompts = array(
+                'title' => "Does the SEO title effectively contain or target the focus keyphrase?\n\nKeyphrase: {$keyphrase}\nSEO Title: {$seo_title}",
+                'description' => "Does the meta description effectively contain or target the focus keyphrase? Is it compelling?\n\nKeyphrase: {$keyphrase}\nMeta Description: {$meta_desc}",
+                'opening' => "Does the opening content (first 2-3 paragraphs) mention or target the focus keyphrase early enough?\n\nKeyphrase: {$keyphrase}\nContent:\n" . mb_substr( $content, 0, 1500 ),
+                'body' => "Is the focus keyphrase used naturally throughout the content? Not too little (underused), not too much (keyword stuffing)?\n\nKeyphrase: {$keyphrase}\nContent:\n" . mb_substr( $content, 0, 3000 ),
+                'url' => "Does the URL/slug contain the focus keyphrase or a relevant variation?\n\nKeyphrase: {$keyphrase}\nURL: {$url}",
+                'overall' => "Overall, how well does this page target the focus keyphrase? Consider title, description, content, and structure.\n\nKeyphrase: {$keyphrase}\nSEO Title: {$seo_title}\nMeta Description: {$meta_desc}\nURL: {$url}\nContent:\n" . mb_substr( $content, 0, 2000 ),
+            );
+
+            if ( ! isset( $prompts[ $check ] ) ) {
+                return new WP_Error( 'invalid_check', 'Unknown check type.', array( 'status' => 400 ) );
+            }
+
+            $model = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
+            $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+                'timeout' => 30,
+                'headers' => array(
+                    'Authorization' => 'Bearer ' . $api_key,
+                    'Content-Type'  => 'application/json',
+                ),
+                'body' => wp_json_encode( array(
+                    'model'       => $model,
+                    'messages'    => array(
+                        array( 'role' => 'system', 'content' => 'You are an SEO expert analyzing a webpage. Respond in JSON format only: { "pass": true/false, "message": "short assessment", "suggestion": "actionable improvement tip or empty string if pass is true" }. Be concise. Write in the same language as the content.' ),
+                        array( 'role' => 'user', 'content' => $prompts[ $check ] ),
+                    ),
+                    'temperature' => 0.3,
+                    'response_format' => array( 'type' => 'json_object' ),
+                ) ),
+            ) );
+
+            if ( is_wp_error( $response ) ) {
+                return new WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+            }
+
+            $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+            $result = $body['choices'][0]['message']['content'] ?? '{}';
+            $parsed = json_decode( $result, true );
+
+            if ( ! is_array( $parsed ) || ! isset( $parsed['pass'] ) ) {
+                return new WP_Error( 'parse_error', 'Could not parse AI response.', array( 'status' => 500 ) );
+            }
+
+            return rest_ensure_response( array(
+                'check'      => $check,
+                'pass'       => (bool) $parsed['pass'],
+                'message'    => sanitize_text_field( $parsed['message'] ?? '' ),
+                'suggestion' => sanitize_text_field( $parsed['suggestion'] ?? '' ),
             ) );
         },
         'permission_callback' => function ( $request ) {
