@@ -339,6 +339,7 @@ export default function SeoMetaBox() {
                             keyphrase={ focusKw[ activeLang ] || '' }
                             seoTitle={ currentTitle }
                             metaDesc={ currentDesc }
+                            onSelectKeyphrase={ updateFocusKw }
                             lang={ activeLang }
                         />
                     </div>

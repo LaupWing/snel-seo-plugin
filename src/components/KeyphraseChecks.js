@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { useSelect } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
-import { CheckCircle, XCircle, Loader2, ScanSearch, Zap } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ScanSearch, Zap, Lightbulb, Search } from 'lucide-react';
 
 // ─── Quick (code-based) checks ──────────────────────────────────────────────
 
@@ -268,9 +268,81 @@ function AiChecks( { keyphrase, seoTitle, metaDesc, lang, postId, permalink } ) 
     );
 }
 
+// ─── AI Suggestions ─────────────────────────────────────────────────────────
+
+function AiSuggest( { lang, postId, onSelect } ) {
+    const [ suggestions, setSuggestions ] = useState( [] );
+    const [ loading, setLoading ] = useState( false );
+
+    const handleSuggest = async () => {
+        if ( ! postId || loading ) return;
+        setLoading( true );
+        setSuggestions( [] );
+
+        try {
+            const renderRes = await fetch( `${ window.snelSeoEditor.renderUrl }/${ postId }?lang=${ lang }`, {
+                headers: { 'X-WP-Nonce': window.snelSeoEditor.nonce },
+            } );
+            const renderData = await renderRes.json();
+            const content = renderData.full_text || '';
+
+            const res = await fetch( `${ window.snelSeoEditor.suggestUrl }/${ postId }`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeoEditor.nonce },
+                body: JSON.stringify( { content, lang } ),
+            } );
+            const data = await res.json();
+            if ( data.keyphrases ) {
+                setSuggestions( data.keyphrases );
+            }
+        } catch ( e ) { /* ignore */ }
+
+        setLoading( false );
+    };
+
+    return (
+        <>
+            <button
+                type="button"
+                onClick={ handleSuggest }
+                disabled={ loading }
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-3"
+            >
+                { loading ? (
+                    <>
+                        <Loader2 size={ 12 } className="animate-spin" />
+                        { __( 'Thinking...', 'snel-seo' ) }
+                    </>
+                ) : (
+                    <>
+                        <Lightbulb size={ 12 } />
+                        { suggestions.length ? __( 'Refresh', 'snel-seo' ) : __( 'Suggest Keyphrases', 'snel-seo' ) }
+                    </>
+                ) }
+            </button>
+
+            { suggestions.length > 0 && (
+                <ul className="space-y-2">
+                    { suggestions.map( ( s, i ) => (
+                        <li key={ i } className="flex items-start gap-2 text-xs">
+                            <Lightbulb size={ 14 } className="text-amber-400 mt-0.5 shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <span className="font-medium text-gray-800">{ s.keyphrase }</span>
+                                { s.reason && (
+                                    <p className="mt-0.5 text-gray-500 leading-relaxed">{ s.reason }</p>
+                                ) }
+                            </div>
+                        </li>
+                    ) ) }
+                </ul>
+            ) }
+        </>
+    );
+}
+
 // ─── Main component with tabs ───────────────────────────────────────────────
 
-export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang } ) {
+export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang, onSelectKeyphrase } ) {
     const [ activeTab, setActiveTab ] = useState( 'quick' );
 
     const { postId, permalink } = useSelect( ( select ) => {
@@ -281,26 +353,29 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang }
         };
     }, [] );
 
-    if ( ! keyphrase ) return null;
-
     const tabs = [
-        { id: 'quick', label: __( 'Quick', 'snel-seo' ), icon: Zap },
-        { id: 'ai', label: __( 'AI Scan', 'snel-seo' ), badge: 'beta' },
+        { id: 'quick', label: __( 'Quick', 'snel-seo' ), icon: Zap, needsKeyphrase: true },
+        { id: 'ai', label: __( 'AI Scan', 'snel-seo' ), icon: Search, badge: 'beta', needsKeyphrase: true },
+        { id: 'suggest', label: __( 'Suggest', 'snel-seo' ), icon: Lightbulb },
     ];
 
     return (
         <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
             {/* Tabs */}
             <div className="flex items-center gap-1 mb-3 border-b border-gray-200 pb-2">
-                { tabs.map( ( tab ) => (
+                { tabs.map( ( tab ) => {
+                    const disabled = tab.needsKeyphrase && ! keyphrase;
+                    return (
                     <button
                         key={ tab.id }
                         type="button"
-                        onClick={ () => setActiveTab( tab.id ) }
+                        onClick={ () => ! disabled && setActiveTab( tab.id ) }
+                        disabled={ disabled }
                         className={ `inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                            activeTab === tab.id
-                                ? 'bg-white text-gray-800 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                            disabled ? 'text-gray-300 cursor-not-allowed'
+                                : activeTab === tab.id
+                                    ? 'bg-white text-gray-800 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
                         }` }
                     >
                         { tab.icon && <tab.icon size={ 12 } /> }
@@ -311,7 +386,8 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang }
                             </span>
                         ) }
                     </button>
-                ) ) }
+                    );
+                } ) }
             </div>
 
             {/* Tab content */}
@@ -333,6 +409,13 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang }
                     lang={ lang }
                     postId={ postId }
                     permalink={ permalink }
+                />
+            ) }
+            { activeTab === 'suggest' && (
+                <AiSuggest
+                    lang={ lang }
+                    postId={ postId }
+                    onSelect={ onSelectKeyphrase }
                 />
             ) }
         </div>

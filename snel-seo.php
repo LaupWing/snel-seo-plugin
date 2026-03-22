@@ -467,6 +467,7 @@ add_action( 'enqueue_block_editor_assets', function () {
         'generateUrl'  => rest_url( 'snel-seo/v1/generate' ),
         'renderUrl'    => rest_url( 'snel-seo/v1/render' ),
         'analyzeUrl'   => rest_url( 'snel-seo/v1/analyze' ),
+        'suggestUrl'   => rest_url( 'snel-seo/v1/suggest-keyphrases' ),
         'nonce'        => wp_create_nonce( 'wp_rest' ),
         'languages'    => $languages,
         'defaultLang'  => snel_seo_get_default_lang(),
@@ -676,6 +677,70 @@ add_action( 'rest_api_init', function () {
                 'message'    => sanitize_text_field( $parsed['message'] ?? '' ),
                 'suggestion' => sanitize_text_field( $parsed['suggestion'] ?? '' ),
             ) );
+        },
+        'permission_callback' => function ( $request ) {
+            return current_user_can( 'edit_post', $request['id'] );
+        },
+    ) );
+} );
+
+/**
+ * REST endpoint: AI-powered keyphrase suggestions based on page content.
+ * Returns array of suggested keyphrases.
+ */
+add_action( 'rest_api_init', function () {
+    register_rest_route( 'snel-seo/v1', '/suggest-keyphrases/(?P<id>\d+)', array(
+        'methods'             => 'POST',
+        'callback'            => function ( $request ) {
+            $post_id = (int) $request['id'];
+            $params  = $request->get_json_params();
+            $content = isset( $params['content'] ) ? sanitize_textarea_field( $params['content'] ) : '';
+            $lang    = isset( $params['lang'] ) ? sanitize_text_field( $params['lang'] ) : 'nl';
+
+            $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+            if ( empty( $api_key ) ) {
+                return new WP_Error( 'no_api_key', 'OpenAI API key not configured.', array( 'status' => 400 ) );
+            }
+
+            $lang_names = array(
+                'nl' => 'Dutch', 'en' => 'English', 'de' => 'German',
+                'fr' => 'French', 'es' => 'Spanish', 'it' => 'Italian',
+            );
+            $lang_name = isset( $lang_names[ $lang ] ) ? $lang_names[ $lang ] : $lang;
+
+            $content = mb_substr( $content, 0, 3000 );
+
+            $model = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
+            $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+                'timeout' => 30,
+                'headers' => array(
+                    'Authorization' => 'Bearer ' . $api_key,
+                    'Content-Type'  => 'application/json',
+                ),
+                'body' => wp_json_encode( array(
+                    'model'       => $model,
+                    'messages'    => array(
+                        array( 'role' => 'system', 'content' => 'You are an SEO expert. Suggest focus keyphrases that a user would type into Google to find this page. Respond in JSON format only: { "keyphrases": [ { "keyphrase": "the keyphrase", "reason": "why this is a good keyphrase (1 sentence, in English)" } ] }. Return exactly 5 suggestions. The keyphrases must be in ' . $lang_name . '. Keep keyphrases concise (1-4 words). Reasons must always be in English.' ),
+                        array( 'role' => 'user', 'content' => "Suggest 5 SEO focus keyphrases in {$lang_name} for this page content. The content includes navigation elements — ignore those and focus on the main body content.\n\nContent:\n{$content}" ),
+                    ),
+                    'temperature' => 0.5,
+                    'response_format' => array( 'type' => 'json_object' ),
+                ) ),
+            ) );
+
+            if ( is_wp_error( $response ) ) {
+                return new WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+            }
+
+            $body   = json_decode( wp_remote_retrieve_body( $response ), true );
+            $result = $body['choices'][0]['message']['content'] ?? '{}';
+            $parsed = json_decode( $result, true );
+
+            if ( ! is_array( $parsed ) || ! isset( $parsed['keyphrases'] ) ) {
+                return new WP_Error( 'parse_error', 'Could not parse AI response.', array( 'status' => 500 ) );
+            }
+
+            return rest_ensure_response( $parsed );
         },
         'permission_callback' => function ( $request ) {
             return current_user_can( 'edit_post', $request['id'] );
