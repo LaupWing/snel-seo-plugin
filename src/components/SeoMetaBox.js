@@ -76,6 +76,24 @@ export default function SeoMetaBox() {
     // AI generate for single language
     const handleGenerate = async ( type ) => {
         if ( ! postId ) return;
+
+        // Debug: log blocks and extracted content
+        const allBlocks = wp.data.select( 'core/block-editor' ).getBlocks();
+        const extractText = ( blocks ) => {
+            const texts = [];
+            for ( const block of blocks ) {
+                if ( block.attributes?.content ) texts.push( block.attributes.content );
+                if ( block.attributes?.heading ) texts.push( block.attributes.heading );
+                if ( block.attributes?.tagline ) texts.push( block.attributes.tagline );
+                if ( block.attributes?.title ) texts.push( block.attributes.title );
+                if ( block.innerBlocks?.length ) texts.push( ...extractText( block.innerBlocks ) );
+            }
+            return texts;
+        };
+        console.log( '[Snel SEO] Raw blocks:', allBlocks );
+        console.log( '[Snel SEO] Extracted texts:', extractText( allBlocks ) );
+        console.log( '[Snel SEO] Block names:', allBlocks.map( ( b ) => b.name ) );
+
         const setLoading = type === 'title' ? setGeneratingTitle : setGeneratingDesc;
         setLoading( true );
         try {
@@ -306,6 +324,7 @@ export default function SeoMetaBox() {
                             keyphrase={ focusKw[ activeLang ] || '' }
                             seoTitle={ currentTitle }
                             metaDesc={ currentDesc }
+                            lang={ activeLang }
                         />
                     </div>
 

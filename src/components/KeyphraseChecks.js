@@ -4,14 +4,6 @@ import { __ } from '@wordpress/i18n';
 import { CheckCircle, XCircle } from 'lucide-react';
 
 /**
- * Strip HTML tags and decode entities.
- */
-function stripHtml( html ) {
-    const doc = new DOMParser().parseFromString( html, 'text/html' );
-    return doc.body.textContent || '';
-}
-
-/**
  * Check if keyphrase appears in text (case-insensitive).
  */
 function contains( text, keyphrase ) {
@@ -19,39 +11,7 @@ function contains( text, keyphrase ) {
     return text.toLowerCase().includes( keyphrase.toLowerCase() );
 }
 
-/**
- * Extract blocks content by type from the editor.
- */
-function getBlockContent( blocks, type ) {
-    const results = [];
-    for ( const block of blocks ) {
-        if ( block.name === type && block.attributes?.content ) {
-            results.push( stripHtml( block.attributes.content ) );
-        }
-        if ( block.innerBlocks?.length ) {
-            results.push( ...getBlockContent( block.innerBlocks, type ) );
-        }
-    }
-    return results;
-}
-
-/**
- * Get all text content from blocks (paragraphs, headings, lists).
- */
-function getAllContent( blocks ) {
-    const results = [];
-    for ( const block of blocks ) {
-        if ( block.attributes?.content ) {
-            results.push( stripHtml( block.attributes.content ) );
-        }
-        if ( block.innerBlocks?.length ) {
-            results.push( ...getAllContent( block.innerBlocks ) );
-        }
-    }
-    return results;
-}
-
-export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc } ) {
+export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc, lang } ) {
     const { permalink, blocks } = useSelect( ( select ) => {
         const editor = select( 'core/editor' );
         const blockEditor = select( 'core/block-editor' );
@@ -65,16 +25,19 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc } ) {
         if ( ! keyphrase ) return [];
 
         const kw = keyphrase.toLowerCase();
+        const escapedKw = kw.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' );
 
-        // Get content from blocks
-        const paragraphs = getBlockContent( blocks, 'core/paragraph' );
-        const headings = getBlockContent( blocks, 'core/heading' );
-        const allContent = getAllContent( blocks );
-        const firstParagraph = paragraphs[ 0 ] || '';
+        // Use shared extractor from theme (language-aware)
+        const extract = window.awExtractContent;
+        const allContent = extract ? extract( blocks, lang || 'nl' ) : [];
         const fullText = allContent.join( ' ' );
+        const firstParagraph = allContent[ 0 ] || '';
+
+        // For headings check, we look at content that likely came from heading attributes
+        const hasInHeading = allContent.some( ( text ) => contains( text, keyphrase ) );
 
         // Count occurrences in body
-        const bodyCount = ( fullText.toLowerCase().match( new RegExp( kw.replace( /[.*+?^${}()|[\]\\]/g, '\\$&' ), 'g' ) ) || [] ).length;
+        const bodyCount = ( fullText.toLowerCase().match( new RegExp( escapedKw, 'g' ) ) || [] ).length;
 
         // Slug from permalink
         const slug = decodeURIComponent( permalink ).toLowerCase();
@@ -93,22 +56,10 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc } ) {
                 bad: __( 'Keyphrase not found in meta description', 'snel-seo' ),
             },
             {
-                id: 'first-paragraph',
+                id: 'first-content',
                 pass: contains( firstParagraph, keyphrase ),
-                good: __( 'Keyphrase found in the first paragraph', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in the first paragraph', 'snel-seo' ),
-            },
-            {
-                id: 'headings',
-                pass: headings.some( ( h ) => contains( h, keyphrase ) ),
-                good: __( 'Keyphrase found in a subheading', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in any subheading', 'snel-seo' ),
-            },
-            {
-                id: 'slug',
-                pass: contains( slug, keyphrase.replace( /\s+/g, '-' ) ),
-                good: __( 'Keyphrase found in URL', 'snel-seo' ),
-                bad: __( 'Keyphrase not found in URL', 'snel-seo' ),
+                good: __( 'Keyphrase found in the opening content', 'snel-seo' ),
+                bad: __( 'Keyphrase not found in the opening content', 'snel-seo' ),
             },
             {
                 id: 'body',
@@ -118,8 +69,14 @@ export default function KeyphraseChecks( { keyphrase, seoTitle, metaDesc } ) {
                     ? __( 'Keyphrase appears only once in the content — try using it a bit more', 'snel-seo' )
                     : __( 'Keyphrase not found in the content', 'snel-seo' ),
             },
+            {
+                id: 'slug',
+                pass: contains( slug, keyphrase.replace( /\s+/g, '-' ) ),
+                good: __( 'Keyphrase found in URL', 'snel-seo' ),
+                bad: __( 'Keyphrase not found in URL', 'snel-seo' ),
+            },
         ];
-    }, [ keyphrase, seoTitle, metaDesc, permalink, blocks ] );
+    }, [ keyphrase, seoTitle, metaDesc, permalink, blocks, lang ] );
 
     if ( ! keyphrase ) return null;
 
