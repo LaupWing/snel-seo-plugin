@@ -7,6 +7,7 @@ import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
 import Tabs from './Tabs';
 import SocialPreview from './SocialPreview';
+import KeyphraseChecks from './KeyphraseChecks';
 
 export default function SeoMetaBox() {
     const [ focusKw, setFocusKw ] = useState( {} );
@@ -300,6 +301,11 @@ export default function SeoMetaBox() {
                             onChange={ ( e ) => updateFocusKw( e.target.value ) }
                             placeholder={ __( 'e.g. antique oak bookcase', 'snel-seo' ) }
                             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
+                        />
+                        <KeyphraseChecks
+                            keyphrase={ focusKw[ activeLang ] || '' }
+                            seoTitle={ currentTitle }
+                            metaDesc={ currentDesc }
                         />
                     </div>
 
