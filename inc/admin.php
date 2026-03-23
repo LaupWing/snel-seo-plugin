@@ -15,6 +15,7 @@ add_action( 'admin_menu', function () {
     add_submenu_page( 'snel-seo', __( 'Dashboard', 'snel-seo' ), __( 'Dashboard', 'snel-seo' ), 'manage_options', 'snel-seo', function () { snel_seo_render_page( 'dashboard' ); } );
     add_submenu_page( 'snel-seo', __( 'Settings', 'snel-seo' ), __( 'Settings', 'snel-seo' ), 'manage_options', 'snel-seo-settings', function () { snel_seo_render_page( 'settings' ); } );
     add_submenu_page( 'snel-seo', __( 'Redirects', 'snel-seo' ), __( 'Redirects', 'snel-seo' ), 'manage_options', 'snel-seo-redirects', function () { snel_seo_render_page( 'redirects' ); } );
+    add_submenu_page( 'snel-seo', __( 'Sitemap', 'snel-seo' ), __( 'Sitemap', 'snel-seo' ), 'manage_options', 'snel-seo-sitemap', function () { snel_seo_render_page( 'sitemap' ); } );
     add_submenu_page( 'snel-seo', __( 'Tools', 'snel-seo' ), __( 'Tools', 'snel-seo' ), 'manage_options', 'snel-seo-tools', function () { snel_seo_render_page( 'tools' ); } );
 } );
 
@@ -26,7 +27,7 @@ function snel_seo_render_page( $page ) {
  * Enqueue admin React app on Snel SEO pages.
  */
 add_action( 'admin_enqueue_scripts', function ( $hook ) {
-    $seo_pages = array( 'toplevel_page_snel-seo', 'snel-seo_page_snel-seo-settings', 'snel-seo_page_snel-seo-redirects', 'snel-seo_page_snel-seo-tools' );
+    $seo_pages = array( 'toplevel_page_snel-seo', 'snel-seo_page_snel-seo-settings', 'snel-seo_page_snel-seo-redirects', 'snel-seo_page_snel-seo-sitemap', 'snel-seo_page_snel-seo-tools' );
     if ( ! in_array( $hook, $seo_pages, true ) ) return;
 
     $asset_file = SNEL_SEO_PLUGIN_DIR . 'build/index.asset.php';

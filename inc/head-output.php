@@ -153,7 +153,7 @@ add_action( 'wp_head', function () {
     if ( $og_desc ) printf( '<meta property="og:description" content="%s" />' . "\n", esc_attr( $og_desc ) );
     if ( $og_image ) printf( '<meta property="og:image" content="%s" />' . "\n", esc_url( $og_image ) );
     printf( '<meta property="og:url" content="%s" />' . "\n", esc_url( $og_url ) );
-    printf( '<meta property="og:type" content="%s" />' . "\n", is_singular() ? 'article' : 'website' );
+    printf( '<meta property="og:type" content="%s" />' . "\n", is_singular() && ! is_front_page() ? 'article' : 'website' );
     printf( '<meta property="og:site_name" content="%s" />' . "\n", esc_attr( $vars['sitename'] ) );
 }, 1 );
 

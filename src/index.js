@@ -2,6 +2,7 @@ import { createRoot } from '@wordpress/element';
 import Dashboard from './pages/Dashboard';
 import Settings from './pages/Settings';
 import Redirects from './pages/Redirects';
+import Sitemap from './pages/Sitemap';
 import Tools from './pages/Tools';
 import './styles/main.css';
 
@@ -9,6 +10,7 @@ const PAGES = {
     dashboard: Dashboard,
     settings: Settings,
     redirects: Redirects,
+    sitemap: Sitemap,
     tools: Tools,
 };
 
