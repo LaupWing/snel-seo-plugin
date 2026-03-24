@@ -95,6 +95,90 @@ add_filter( 'pre_get_document_title', function ( $title ) {
 }, 15 );
 
 /**
+ * Auto-generate a meta description for any singular post.
+ * Fallback chain: custom SEO desc → excerpt → content → post meta text fields → title.
+ */
+function snel_seo_auto_description( $post_id ) {
+    // 1. Excerpt.
+    $excerpt = get_the_excerpt( $post_id );
+    if ( $excerpt && $excerpt !== __( 'No excerpt', 'default' ) ) {
+        return wp_trim_words( wp_strip_all_tags( $excerpt ), 25, '…' );
+    }
+
+    // 2. Post content.
+    $post = get_post( $post_id );
+    if ( $post && ! empty( $post->post_content ) ) {
+        $text = wp_strip_all_tags( strip_shortcodes( $post->post_content ) );
+        $text = preg_replace( '/\s+/', ' ', trim( $text ) );
+        if ( strlen( $text ) > 10 ) {
+            return mb_substr( $text, 0, 155 ) . '…';
+        }
+    }
+
+    // 3. Common meta fields (multilingual arrays or plain strings).
+    $lang    = snel_seo_get_current_lang();
+    $default = snel_seo_get_default_lang();
+    $meta_keys = array( '_product_short_description', '_product_description', '_short_description', '_description' );
+
+    foreach ( $meta_keys as $key ) {
+        $val = get_post_meta( $post_id, $key, true );
+        if ( ! $val ) continue;
+
+        $text = '';
+        if ( is_array( $val ) ) {
+            $text = ! empty( $val[ $lang ] ) ? $val[ $lang ] : ( ! empty( $val[ $default ] ) ? $val[ $default ] : '' );
+        } elseif ( is_string( $val ) ) {
+            $decoded = json_decode( $val, true );
+            if ( is_array( $decoded ) ) {
+                $text = ! empty( $decoded[ $lang ] ) ? $decoded[ $lang ] : ( ! empty( $decoded[ $default ] ) ? $decoded[ $default ] : '' );
+            } else {
+                $text = $val;
+            }
+        }
+
+        if ( $text ) {
+            $text = wp_strip_all_tags( $text );
+            $text = preg_replace( '/\s+/', ' ', trim( $text ) );
+            if ( strlen( $text ) > 10 ) {
+                return mb_substr( $text, 0, 155 ) . '…';
+            }
+        }
+    }
+
+    // 4. Title + site name.
+    $settings  = get_option( 'wpseo_titles', array() );
+    $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
+    return get_the_title( $post_id ) . ' — ' . $site_name;
+}
+
+/**
+ * Output canonical URL (language-aware).
+ */
+add_action( 'wp_head', function () {
+    // Remove WordPress default canonical.
+    remove_action( 'wp_head', 'rel_canonical' );
+
+    $url = '';
+    if ( is_singular() ) {
+        $url = get_permalink();
+    } elseif ( is_tax() || is_category() || is_tag() ) {
+        $url = get_term_link( get_queried_object() );
+    } elseif ( is_post_type_archive() ) {
+        $url = get_post_type_archive_link( get_queried_object()->name );
+    } elseif ( is_front_page() || is_home() ) {
+        $url = home_url( '/' );
+    }
+
+    if ( $url && ! is_wp_error( $url ) ) {
+        // Add language prefix if a translation helper exists.
+        if ( function_exists( 'snel_url' ) ) {
+            $url = snel_url( $url );
+        }
+        printf( '<link rel="canonical" href="%s" />' . "\n", esc_url( $url ) );
+    }
+}, 0 );
+
+/**
  * Output meta description and Open Graph tags.
  */
 add_action( 'wp_head', function () {
@@ -123,7 +207,22 @@ add_action( 'wp_head', function () {
             $description = isset( $settings['metadesc-post'] ) ? $settings['metadesc-post'] : '';
         } elseif ( is_page() ) {
             $description = isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '';
+        } elseif ( is_tax() || is_category() || is_tag() ) {
+            $term = get_queried_object();
+            if ( $term && ! empty( $term->description ) ) {
+                $description = mb_substr( wp_strip_all_tags( $term->description ), 0, 155 );
+            }
         }
+    }
+
+    // Singular fallback: auto-generate from content.
+    if ( ! $description && is_singular() ) {
+        $description = snel_seo_auto_description( get_queried_object_id() );
+    }
+
+    // Global fallback.
+    if ( ! $description ) {
+        $description = isset( $settings['metadesc-home-wpseo'] ) ? $settings['metadesc-home-wpseo'] : '';
     }
 
     if ( $description ) {
@@ -135,7 +234,12 @@ add_action( 'wp_head', function () {
     $og_title = '';
     $og_desc  = '';
     $og_image = '';
-    $og_url   = is_singular() ? get_permalink() : home_url( '/' );
+
+    // Language-aware OG URL.
+    $og_url = is_singular() ? get_permalink() : home_url( '/' );
+    if ( function_exists( 'snel_url' ) ) {
+        $og_url = snel_url( $og_url );
+    }
 
     if ( is_singular() ) {
         $post_id  = get_queried_object_id();
