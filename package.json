@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "build": "wp-scripts build",
-    "start": "wp-scripts start"
+    "start": "wp-scripts start",
+    "zip": "node scripts/zip.js"
   },
   "devDependencies": {
     "@wordpress/scripts": "^27.9.0"
