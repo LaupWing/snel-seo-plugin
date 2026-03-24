@@ -17,6 +17,19 @@ define( 'SNEL_SEO_VERSION', '1.0.0' );
 define( 'SNEL_SEO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SNEL_SEO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+// Auto-updater — checks GitHub releases for new versions.
+require_once SNEL_SEO_PLUGIN_DIR . 'vendor/autoload.php';
+
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
+
+$snel_seo_updater = PucFactory::buildUpdateChecker(
+    'https://github.com/LaupWing/snel-seo-plugin/',
+    __FILE__,
+    'snel-seo'
+);
+$snel_seo_updater->setAuthentication( defined( 'SNEL_SEO_GITHUB_TOKEN' ) ? SNEL_SEO_GITHUB_TOKEN : '' );
+$snel_seo_updater->getVcsApi()->enableReleaseAssets();
+
 // Load modules.
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/languages.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/redirects.php';
