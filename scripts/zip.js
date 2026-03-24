@@ -56,9 +56,21 @@ const excludes = [
     'webpack.config.js',
     'postcss.config.js',
     '.DS_Store',
-].map(e => `-x "${e}"`).join(' ');
+];
 
-execSync(`cd "${root}" && zip -r "${zipPath}" . ${excludes}`, { stdio: 'inherit' });
+// Create a temp folder named 'snel-seo' so the zip extracts to the correct folder name.
+const tmpDir = path.join(root, '..', 'snel-seo-zip-tmp');
+const tmpPlugin = path.join(tmpDir, 'snel-seo');
+
+if (fs.existsSync(tmpDir)) {
+    execSync(`rm -rf "${tmpDir}"`);
+}
+fs.mkdirSync(tmpPlugin, { recursive: true });
+
+const rsyncExcludes = excludes.map(e => `--exclude='${e}'`).join(' ');
+execSync(`rsync -a ${rsyncExcludes} "${root}/" "${tmpPlugin}/"`, { stdio: 'inherit' });
+execSync(`cd "${tmpDir}" && zip -r "${zipPath}" snel-seo/`, { stdio: 'inherit' });
+execSync(`rm -rf "${tmpDir}"`);
 
 // Sync version to package.json
 const pkgPath = path.join(root, 'package.json');
