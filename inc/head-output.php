@@ -36,6 +36,41 @@ function snel_seo_resolve_template( $template, $vars = array() ) {
 }
 
 /**
+ * Get a settings value that may be multilingual (JSON-encoded lang object).
+ * Returns the value for the current language, falling back to default language.
+ */
+function snel_seo_get_ml_setting( $settings, $key, $fallback = '' ) {
+    $raw = isset( $settings[ $key ] ) ? $settings[ $key ] : $fallback;
+    if ( ! $raw ) return $fallback;
+
+    if ( ! snel_seo_is_multilingual() ) {
+        // Not multilingual — if it's a JSON string, extract default lang value.
+        if ( is_string( $raw ) ) {
+            $decoded = json_decode( $raw, true );
+            if ( is_array( $decoded ) ) {
+                $default = snel_seo_get_default_lang();
+                return ! empty( $decoded[ $default ] ) ? $decoded[ $default ] : $fallback;
+            }
+        }
+        return $raw;
+    }
+
+    $lang    = snel_seo_get_current_lang();
+    $default = snel_seo_get_default_lang();
+
+    if ( is_string( $raw ) ) {
+        $decoded = json_decode( $raw, true );
+        if ( is_array( $decoded ) ) {
+            return ! empty( $decoded[ $lang ] ) ? $decoded[ $lang ] : ( ! empty( $decoded[ $default ] ) ? $decoded[ $default ] : $fallback );
+        }
+        // Plain string — return as-is (legacy).
+        return $raw;
+    }
+
+    return $fallback;
+}
+
+/**
  * Get template variables for the current page context.
  */
 function snel_seo_get_vars() {
@@ -69,14 +104,14 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     }
 
     if ( is_front_page() || is_home() ) {
-        $template = isset( $settings['title-home-wpseo'] ) ? $settings['title-home-wpseo'] : '';
+        $template = snel_seo_get_ml_setting( $settings, 'title-home-wpseo' );
         if ( $template ) {
             return snel_seo_resolve_template( $template, $vars );
         }
     }
 
     if ( is_singular( 'post' ) ) {
-        $template = isset( $settings['title-post'] ) ? $settings['title-post'] : '';
+        $template = snel_seo_get_ml_setting( $settings, 'title-post' );
         if ( $template ) {
             $vars['title'] = get_the_title();
             return snel_seo_resolve_template( $template, $vars );
@@ -84,7 +119,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     }
 
     if ( is_page() ) {
-        $template = isset( $settings['title-page'] ) ? $settings['title-page'] : '';
+        $template = snel_seo_get_ml_setting( $settings, 'title-page' );
         if ( $template ) {
             $vars['title'] = get_the_title();
             return snel_seo_resolve_template( $template, $vars );
@@ -202,11 +237,11 @@ add_action( 'wp_head', function () {
 
     if ( ! $description ) {
         if ( is_front_page() || is_home() ) {
-            $description = isset( $settings['metadesc-home-wpseo'] ) ? $settings['metadesc-home-wpseo'] : '';
+            $description = snel_seo_get_ml_setting( $settings, 'metadesc-home-wpseo' );
         } elseif ( is_singular( 'post' ) ) {
-            $description = isset( $settings['metadesc-post'] ) ? $settings['metadesc-post'] : '';
+            $description = snel_seo_get_ml_setting( $settings, 'metadesc-post' );
         } elseif ( is_page() ) {
-            $description = isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '';
+            $description = snel_seo_get_ml_setting( $settings, 'metadesc-page' );
         } elseif ( is_tax() || is_category() || is_tag() ) {
             $term = get_queried_object();
             if ( $term && ! empty( $term->description ) ) {
@@ -222,7 +257,7 @@ add_action( 'wp_head', function () {
 
     // Global fallback.
     if ( ! $description ) {
-        $description = isset( $settings['metadesc-home-wpseo'] ) ? $settings['metadesc-home-wpseo'] : '';
+        $description = snel_seo_get_ml_setting( $settings, 'metadesc-home-wpseo' );
     }
 
     if ( $description ) {

@@ -41,25 +41,59 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 
     $settings = get_option( 'wpseo_titles', array() );
 
+    $languages    = snel_seo_get_languages();
+    $default_lang = snel_seo_get_default_lang();
+    $multilingual = snel_seo_is_multilingual();
+
+    // Multilingual settings: decode JSON strings back to objects for the frontend.
+    $ml_keys = array(
+        'title_home'    => 'title-home-wpseo',
+        'metadesc_home' => 'metadesc-home-wpseo',
+        'title_post'    => 'title-post',
+        'metadesc_post' => 'metadesc-post',
+        'title_page'    => 'title-page',
+        'metadesc_page' => 'metadesc-page',
+    );
+    $settings_out = array(
+        'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
+        'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
+        'default_og_image' => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
+    );
+    $ml_defaults = array(
+        'title_home'    => '%%sitename%% %%separator%% %%sitedesc%%',
+        'metadesc_home' => '',
+        'title_post'    => '%%title%% %%separator%% %%sitename%%',
+        'metadesc_post' => '',
+        'title_page'    => '%%title%% %%separator%% %%sitename%%',
+        'metadesc_page' => '',
+    );
+    foreach ( $ml_keys as $js_key => $wp_key ) {
+        $raw = isset( $settings[ $wp_key ] ) ? $settings[ $wp_key ] : $ml_defaults[ $js_key ];
+        if ( $multilingual && is_string( $raw ) ) {
+            $decoded = json_decode( $raw, true );
+            if ( is_array( $decoded ) ) {
+                $settings_out[ $js_key ] = $decoded;
+            } else {
+                // Legacy plain string — wrap in default lang
+                $settings_out[ $js_key ] = $raw ? array( $default_lang => $raw ) : array();
+            }
+        } else {
+            $settings_out[ $js_key ] = $raw;
+        }
+    }
+
     wp_localize_script( 'snel-seo-admin', 'snelSeo', array(
-        'restUrl'  => rest_url( 'snel-seo/v1' ),
-        'nonce'    => wp_create_nonce( 'wp_rest' ),
-        'version'  => SNEL_SEO_VERSION,
-        'settings' => array(
-            'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
-            'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
-            'title_home'       => isset( $settings['title-home-wpseo'] ) ? $settings['title-home-wpseo'] : '%%sitename%% %%separator%% %%sitedesc%%',
-            'metadesc_home'    => isset( $settings['metadesc-home-wpseo'] ) ? $settings['metadesc-home-wpseo'] : '',
-            'title_post'       => isset( $settings['title-post'] ) ? $settings['title-post'] : '%%title%% %%separator%% %%sitename%%',
-            'metadesc_post'    => isset( $settings['metadesc-post'] ) ? $settings['metadesc-post'] : '',
-            'title_page'       => isset( $settings['title-page'] ) ? $settings['title-page'] : '%%title%% %%separator%% %%sitename%%',
-            'metadesc_page'    => isset( $settings['metadesc-page'] ) ? $settings['metadesc-page'] : '',
-            'default_og_image' => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
-        ),
-        'favicon'  => get_site_icon_url( 28 ),
-        'siteUrl'  => home_url(),
-        'siteName' => get_bloginfo( 'name' ),
-        'siteDesc' => get_bloginfo( 'description' ),
+        'restUrl'      => rest_url( 'snel-seo/v1' ),
+        'nonce'        => wp_create_nonce( 'wp_rest' ),
+        'version'      => SNEL_SEO_VERSION,
+        'settings'     => $settings_out,
+        'multilingual' => $multilingual,
+        'languages'    => $languages,
+        'defaultLang'  => $default_lang,
+        'favicon'      => get_site_icon_url( 28 ),
+        'siteUrl'      => home_url(),
+        'siteName'     => get_bloginfo( 'name' ),
+        'siteDesc'     => get_bloginfo( 'description' ),
     ) );
 } );
 
@@ -72,26 +106,120 @@ add_action( 'rest_api_init', function () {
         'callback'            => 'snel_seo_save_settings',
         'permission_callback' => function () { return current_user_can( 'manage_options' ); },
     ) );
+
+    register_rest_route( 'snel-seo/v1', '/settings/translate', array(
+        'methods'             => 'POST',
+        'callback'            => 'snel_seo_translate_setting',
+        'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+    ) );
 } );
 
 function snel_seo_save_settings( WP_REST_Request $request ) {
     $params   = $request->get_json_params();
     $settings = get_option( 'wpseo_titles', array() );
 
-    $allowed_keys = array(
-        'website_name'  => 'website_name', 'separator' => 'separator',
-        'title_home'    => 'title-home-wpseo', 'metadesc_home' => 'metadesc-home-wpseo',
-        'title_post'    => 'title-post', 'metadesc_post' => 'metadesc-post',
-        'title_page'    => 'title-page', 'metadesc_page' => 'metadesc-page',
+    // Keys that stay as plain strings.
+    $plain_keys = array(
+        'website_name'     => 'website_name',
+        'separator'        => 'separator',
         'default_og_image' => 'default_og_image',
     );
 
-    foreach ( $allowed_keys as $js_key => $wp_key ) {
+    // Keys that can be multilingual (saved as JSON string when object).
+    $ml_keys = array(
+        'title_home'    => 'title-home-wpseo',
+        'metadesc_home' => 'metadesc-home-wpseo',
+        'title_post'    => 'title-post',
+        'metadesc_post' => 'metadesc-post',
+        'title_page'    => 'title-page',
+        'metadesc_page' => 'metadesc-page',
+    );
+
+    foreach ( $plain_keys as $js_key => $wp_key ) {
         if ( isset( $params[ $js_key ] ) ) {
             $settings[ $wp_key ] = sanitize_text_field( $params[ $js_key ] );
         }
     }
 
+    foreach ( $ml_keys as $js_key => $wp_key ) {
+        if ( isset( $params[ $js_key ] ) ) {
+            $value = $params[ $js_key ];
+            if ( is_array( $value ) ) {
+                // Sanitize each language value and store as JSON string.
+                $sanitized = array();
+                foreach ( $value as $lang => $text ) {
+                    $sanitized[ sanitize_key( $lang ) ] = sanitize_text_field( $text );
+                }
+                $settings[ $wp_key ] = wp_json_encode( $sanitized );
+            } else {
+                $settings[ $wp_key ] = sanitize_text_field( $value );
+            }
+        }
+    }
+
     update_option( 'wpseo_titles', $settings );
     return rest_ensure_response( array( 'success' => true ) );
+}
+
+/**
+ * Translate a settings template text to another language via OpenAI.
+ */
+function snel_seo_translate_setting( WP_REST_Request $request ) {
+    $params = $request->get_json_params();
+    $text   = sanitize_text_field( $params['text'] ?? '' );
+    $lang   = sanitize_key( $params['lang'] ?? '' );
+    $type   = sanitize_key( $params['type'] ?? 'description' );
+
+    if ( ! $text || ! $lang ) {
+        return new WP_Error( 'missing_params', 'Text and lang are required.', array( 'status' => 400 ) );
+    }
+
+    $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+    if ( empty( $api_key ) ) {
+        return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Go to Snelstack Settings to add your key.', array( 'status' => 400 ) );
+    }
+
+    $lang_names = array(
+        'nl' => 'Dutch', 'en' => 'English', 'de' => 'German', 'fr' => 'French',
+        'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese', 'ja' => 'Japanese',
+        'zh' => 'Chinese', 'ko' => 'Korean', 'ar' => 'Arabic', 'ru' => 'Russian',
+        'pl' => 'Polish', 'tr' => 'Turkish', 'sv' => 'Swedish',
+    );
+    $lang_name = $lang_names[ $lang ] ?? $lang;
+
+    if ( 'title' === $type ) {
+        $prompt = "Translate this SEO title template to {$lang_name}. "
+                . "Keep template variables like %%sitename%%, %%separator%%, %%sitedesc%%, %%title%% exactly as they are — do not translate them. "
+                . "Only translate the human-readable text parts. Keep it under 60 characters. "
+                . "Return ONLY the translated title, nothing else.\n\nTitle: {$text}";
+    } else {
+        $prompt = "Translate this SEO meta description to {$lang_name}. "
+                . "Keep template variables like %%sitename%%, %%sitedesc%% exactly as they are — do not translate them. "
+                . "Only translate the human-readable text parts. Keep it between 120-155 characters. "
+                . "Return ONLY the translated description, nothing else.\n\nDescription: {$text}";
+    }
+
+    $model    = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
+    $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+        'timeout' => 30,
+        'headers' => array( 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ),
+        'body'    => wp_json_encode( array(
+            'model'       => $model,
+            'messages'    => array(
+                array( 'role' => 'system', 'content' => 'You are a professional translator specializing in SEO content. Translate accurately while preserving template variables.' ),
+                array( 'role' => 'user', 'content' => $prompt ),
+            ),
+            'temperature' => 0.3,
+        ) ),
+    ) );
+
+    if ( is_wp_error( $response ) ) {
+        return new WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
+    }
+
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+    $result = $body['choices'][0]['message']['content'] ?? '';
+    $result = trim( $result, " \t\n\r\0\x0B\"'" );
+
+    return rest_ensure_response( array( 'result' => $result ) );
 }
