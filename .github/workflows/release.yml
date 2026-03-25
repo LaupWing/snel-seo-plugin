@@ -1,8 +1,8 @@
 name: Build Release Zip
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
 
 jobs:
   build:
@@ -10,22 +10,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract version from plugin file
+        id: version
+        run: |
+          VERSION=$(grep -oP "Version:\s*\K[0-9.]+" snel-seo.php)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if release already exists
+        id: check
+        run: |
+          if gh release view "${{ steps.version.outputs.tag }}" > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Install Composer dependencies
+        if: steps.check.outputs.exists == 'false'
         run: composer install --no-dev --optimize-autoloader
 
       - name: Setup Node.js
+        if: steps.check.outputs.exists == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
       - name: Install npm dependencies
+        if: steps.check.outputs.exists == 'false'
         run: npm ci
 
       - name: Build assets
+        if: steps.check.outputs.exists == 'false'
         run: npm run build
 
       - name: Create plugin zip
+        if: steps.check.outputs.exists == 'false'
         run: |
           mkdir -p /tmp/snel-seo
           rsync -a --exclude='.git' \
@@ -42,7 +65,11 @@ jobs:
                    ./ /tmp/snel-seo/
           cd /tmp && zip -r snel-seo.zip snel-seo/
 
-      - name: Upload release asset
+      - name: Create release and upload zip
+        if: steps.check.outputs.exists == 'false'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
           files: /tmp/snel-seo.zip
+          generate_release_notes: true
