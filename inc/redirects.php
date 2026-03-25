@@ -40,7 +40,40 @@ add_action( 'admin_init', function () {
 } );
 
 /**
- * Process redirects on frontend requests.
+ * Create 404 log table.
+ */
+function snel_seo_create_404_log_table() {
+    global $wpdb;
+    $table   = $wpdb->prefix . 'snel_seo_404_log';
+    $charset = $wpdb->get_charset_collate();
+
+    $sql = "CREATE TABLE $table (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        url varchar(500) NOT NULL,
+        hits bigint(20) unsigned NOT NULL DEFAULT 1,
+        referrer varchar(500) DEFAULT '',
+        user_agent varchar(500) DEFAULT '',
+        first_seen datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_seen datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY url (url(191))
+    ) $charset;";
+
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    dbDelta( $sql );
+}
+
+// Create 404 table on admin init if it doesn't exist.
+add_action( 'admin_init', function () {
+    global $wpdb;
+    $table = $wpdb->prefix . 'snel_seo_404_log';
+    if ( $wpdb->get_var( "SHOW TABLES LIKE '$table'" ) !== $table ) {
+        snel_seo_create_404_log_table();
+    }
+} );
+
+/**
+ * Process redirects on frontend requests + log 404s.
  */
 add_action( 'template_redirect', function () {
     global $wpdb;
@@ -62,6 +95,31 @@ add_action( 'template_redirect', function () {
         }
         wp_redirect( $target, (int) $row->type );
         exit;
+    }
+
+    // Log 404s.
+    if ( is_404() ) {
+        $log_table  = $wpdb->prefix . 'snel_seo_404_log';
+        $referrer   = isset( $_SERVER['HTTP_REFERER'] ) ? esc_url_raw( $_SERVER['HTTP_REFERER'] ) : '';
+        $user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'], 0, 500 ) ) : '';
+
+        $existing = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id FROM $log_table WHERE url = %s LIMIT 1",
+            $request_path
+        ) );
+
+        if ( $existing ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE $log_table SET hits = hits + 1, last_seen = NOW(), referrer = %s, user_agent = %s WHERE id = %d",
+                $referrer, $user_agent, $existing->id
+            ) );
+        } else {
+            $wpdb->insert( $log_table, array(
+                'url'        => $request_path,
+                'referrer'   => $referrer,
+                'user_agent' => $user_agent,
+            ) );
+        }
     }
 } );
 
@@ -221,6 +279,48 @@ add_action( 'rest_api_init', function () {
         'callback'            => function () {
             global $wpdb;
             $table = $wpdb->prefix . 'snel_seo_redirects';
+            $wpdb->query( "TRUNCATE TABLE $table" );
+            return rest_ensure_response( array( 'success' => true ) );
+        },
+        'permission_callback' => function () {
+            return current_user_can( 'manage_options' );
+        },
+    ) );
+
+    // 404 Log — list all.
+    register_rest_route( 'snel-seo/v1', '/404-log', array(
+        'methods'             => 'GET',
+        'callback'            => function () {
+            global $wpdb;
+            $table = $wpdb->prefix . 'snel_seo_404_log';
+            $results = $wpdb->get_results( "SELECT * FROM $table ORDER BY last_seen DESC", ARRAY_A );
+            return rest_ensure_response( $results ?: array() );
+        },
+        'permission_callback' => function () {
+            return current_user_can( 'manage_options' );
+        },
+    ) );
+
+    // 404 Log — delete single entry.
+    register_rest_route( 'snel-seo/v1', '/404-log/(?P<id>\d+)', array(
+        'methods'             => 'DELETE',
+        'callback'            => function ( $request ) {
+            global $wpdb;
+            $table = $wpdb->prefix . 'snel_seo_404_log';
+            $wpdb->delete( $table, array( 'id' => (int) $request['id'] ) );
+            return rest_ensure_response( array( 'success' => true ) );
+        },
+        'permission_callback' => function () {
+            return current_user_can( 'manage_options' );
+        },
+    ) );
+
+    // 404 Log — clear all.
+    register_rest_route( 'snel-seo/v1', '/404-log/all', array(
+        'methods'             => 'DELETE',
+        'callback'            => function () {
+            global $wpdb;
+            $table = $wpdb->prefix . 'snel_seo_404_log';
             $wpdb->query( "TRUNCATE TABLE $table" );
             return rest_ensure_response( array( 'success' => true ) );
         },

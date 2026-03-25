@@ -42,3 +42,4 @@ require_once SNEL_SEO_PLUGIN_DIR . 'inc/rest-api.php';
 
 // Activation hook.
 register_activation_hook( __FILE__, 'snel_seo_create_redirects_table' );
+register_activation_hook( __FILE__, 'snel_seo_create_404_log_table' );
