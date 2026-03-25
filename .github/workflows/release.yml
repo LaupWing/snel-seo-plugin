@@ -41,7 +41,7 @@ jobs:
 
       - name: Install npm dependencies
         if: steps.check.outputs.exists == 'false'
-        run: npm ci
+        run: npm install --no-optional
 
       - name: Build assets
         if: steps.check.outputs.exists == 'false'
