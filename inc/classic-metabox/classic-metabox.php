@@ -1,0 +1,463 @@
+<?php
+/**
+ * Classic editor SEO meta box — for post types that don't use Gutenberg (e.g. product).
+ * Renders SEO title, meta description, Google Preview, Social Preview, language tabs, and Translate All.
+ *
+ * @package SnelSEO
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Get fallback title for a language from product meta.
+ */
+function snel_seo_classic_get_fallback_title( $post, $lang, $default_lang ) {
+    if ( $lang === $default_lang ) {
+        return $post->post_title;
+    }
+    $translated = get_post_meta( $post->ID, '_title_' . $lang, true );
+    return $translated ? $translated : $post->post_title;
+}
+
+/**
+ * Get fallback description for a language from product meta.
+ * Chain: short description → long description.
+ */
+function snel_seo_classic_get_fallback_desc( $post_id, $lang, $default_lang ) {
+    // Try short description first.
+    $short = get_post_meta( $post_id, '_product_short_description', true );
+    if ( $short ) {
+        if ( is_array( $short ) && ! empty( $short[ $lang ] ) ) return $short[ $lang ];
+        if ( is_array( $short ) && ! empty( $short[ $default_lang ] ) ) return $short[ $default_lang ];
+        if ( is_string( $short ) && $short ) return $short;
+    }
+
+    // Try long description.
+    $desc = get_post_meta( $post_id, '_product_description', true );
+    if ( $desc ) {
+        if ( is_array( $desc ) && ! empty( $desc[ $lang ] ) ) return mb_substr( wp_strip_all_tags( $desc[ $lang ] ), 0, 155 );
+        if ( is_array( $desc ) && ! empty( $desc[ $default_lang ] ) ) return mb_substr( wp_strip_all_tags( $desc[ $default_lang ] ), 0, 155 );
+        if ( is_string( $desc ) && $desc ) return mb_substr( wp_strip_all_tags( $desc ), 0, 155 );
+    }
+
+    return '';
+}
+
+/**
+ * Render the classic SEO meta box content.
+ */
+function snel_seo_classic_metabox_render( $post ) {
+    $languages    = snel_seo_get_languages();
+    $default_lang = snel_seo_get_default_lang();
+    $multilingual = snel_seo_is_multilingual();
+
+    $settings  = get_option( 'wpseo_titles', array() );
+    $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
+    $sep_key   = isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash';
+    $sep_map   = array(
+        'sc-dash' => "\xe2\x80\x93", 'sc-hyphen' => '-', 'sc-pipe' => '|',
+        'sc-middot' => "\xc2\xb7", 'sc-bullet' => "\xe2\x80\xa2", 'sc-raquo' => "\xc2\xbb", 'sc-slash' => '/',
+    );
+    $separator = isset( $sep_map[ $sep_key ] ) ? $sep_map[ $sep_key ] : "\xe2\x80\x93";
+
+    // Load existing SEO meta.
+    $raw_title = get_post_meta( $post->ID, '_snel_seo_title', true );
+    $raw_desc  = get_post_meta( $post->ID, '_snel_seo_metadesc', true );
+    $seo_titles = $raw_title ? json_decode( $raw_title, true ) : array();
+    $seo_descs  = $raw_desc ? json_decode( $raw_desc, true ) : array();
+
+    if ( ! is_array( $seo_titles ) ) $seo_titles = array();
+    if ( ! is_array( $seo_descs ) ) $seo_descs = array();
+
+    // Pre-fill from product data if SEO fields are empty.
+    foreach ( $languages as $lang ) {
+        $code = $lang['code'];
+        if ( empty( $seo_titles[ $code ] ) ) {
+            $fallback_title = snel_seo_classic_get_fallback_title( $post, $code, $default_lang );
+            if ( $fallback_title ) {
+                $seo_titles[ $code ] = $fallback_title . ' ' . $separator . ' ' . $site_name;
+            }
+        }
+        if ( empty( $seo_descs[ $code ] ) ) {
+            $seo_descs[ $code ] = snel_seo_classic_get_fallback_desc( $post->ID, $code, $default_lang );
+        }
+    }
+
+    $permalink    = get_permalink( $post->ID );
+    $nonce        = wp_create_nonce( 'wp_rest' );
+    $rest_url     = rest_url( 'snel-seo/v1' );
+    $favicon      = get_site_icon_url( 28 );
+    $featured_img = get_the_post_thumbnail_url( $post->ID, 'large' );
+    $og_image     = $featured_img ?: ( isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '' );
+    $domain       = wp_parse_url( $permalink, PHP_URL_HOST ) ?: 'example.com';
+
+    wp_nonce_field( 'snel_seo_classic_metabox', 'snel_seo_classic_nonce' );
+    ?>
+
+    <style>
+        .snel-seo-classic { font-size: 13px; }
+        .snel-seo-classic .snel-seo-lang-switcher { display: flex; gap: 4px; align-items: center; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #e0e0e0; }
+        .snel-seo-classic .snel-seo-lang-btn { padding: 4px 12px; border: 1px solid #c3c4c7; background: #f0f0f1; color: #50575e; cursor: pointer; font-size: 12px; font-weight: 600; line-height: 1.5; border-radius: 3px; position: relative; }
+        .snel-seo-classic .snel-seo-lang-btn.active { background: #2271b1; color: #fff; border-color: #2271b1; }
+        .snel-seo-classic .snel-seo-lang-btn:hover:not(.active) { background: #e0e0e0; }
+        .snel-seo-classic .snel-seo-lang-btn .snel-seo-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
+        .snel-seo-classic .snel-seo-dot-green { background: #00a32a; }
+        .snel-seo-classic .snel-seo-dot-amber { background: #dba617; }
+        .snel-seo-classic .snel-seo-translate-all { margin-left: 12px; color: #6b21a8; border-color: #d8b4fe; background: #faf5ff; }
+        .snel-seo-classic .snel-seo-translate-all:hover { background: #f3e8ff; }
+        .snel-seo-classic .snel-seo-field { margin-bottom: 14px; }
+        .snel-seo-classic .snel-seo-field label { display: block; font-weight: 600; font-size: 12px; margin-bottom: 4px; text-transform: uppercase; color: #50575e; }
+        .snel-seo-classic .snel-seo-field input,
+        .snel-seo-classic .snel-seo-field textarea { width: 100%; }
+        .snel-seo-classic .snel-seo-char-count { font-size: 11px; color: #888; margin-top: 2px; }
+        .snel-seo-classic .snel-seo-char-count.over { color: #d63638; }
+        .snel-seo-classic .snel-seo-translate-status { margin-left: 8px; font-style: italic; color: #666; font-size: 12px; }
+
+        /* Google Preview */
+        .snel-seo-classic .snel-seo-gp { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-top: 10px; }
+        .snel-seo-classic .snel-seo-gp-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+        .snel-seo-classic .snel-seo-gp-header-label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+        .snel-seo-classic .snel-seo-gp-favicon-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .snel-seo-classic .snel-seo-gp-favicon { width: 28px; height: 28px; background: #f1f3f4; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .snel-seo-classic .snel-seo-gp-favicon img { width: 20px; height: 20px; object-fit: contain; }
+        .snel-seo-classic .snel-seo-gp-domain { font-size: 13px; color: #202124; }
+        .snel-seo-classic .snel-seo-gp-path { font-size: 12px; color: #5f6368; }
+        .snel-seo-classic .snel-seo-gp-title { font-size: 20px; line-height: 1.3; color: #1a0dab; font-family: arial, sans-serif; margin: 4px 0; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .snel-seo-classic .snel-seo-gp-title:hover { text-decoration: underline; }
+        .snel-seo-classic .snel-seo-gp-desc { font-size: 14px; color: #4d5156; font-family: arial, sans-serif; line-height: 1.58; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    </style>
+
+    <div class="snel-seo-classic">
+
+        <?php if ( $multilingual ) : ?>
+        <div class="snel-seo-lang-switcher">
+            <?php foreach ( $languages as $lang ) :
+                $code = $lang['code'];
+                $has_title = ! empty( $seo_titles[ $code ] );
+                $has_desc  = ! empty( $seo_descs[ $code ] );
+                $dot_class = '';
+                if ( ! $lang['default'] ) {
+                    if ( $has_title && $has_desc ) $dot_class = 'snel-seo-dot-green';
+                    elseif ( $has_title || $has_desc ) $dot_class = 'snel-seo-dot-amber';
+                }
+            ?>
+                <button type="button"
+                    class="snel-seo-lang-btn<?php echo $code === $default_lang ? ' active' : ''; ?>"
+                    data-lang="<?php echo esc_attr( $code ); ?>">
+                    <?php echo esc_html( $lang['label'] ); ?>
+                    <?php if ( $lang['default'] ) : ?>
+                        <span style="font-size:10px;">(<?php esc_html_e( 'default', 'snel-seo' ); ?>)</span>
+                    <?php endif; ?>
+                    <?php if ( $dot_class ) : ?>
+                        <span class="snel-seo-dot <?php echo esc_attr( $dot_class ); ?>"></span>
+                    <?php endif; ?>
+                </button>
+            <?php endforeach; ?>
+
+            <button type="button" class="button snel-seo-translate-all" id="snel-seo-translate-all-btn">
+                &#10022; <?php esc_html_e( 'Translate All', 'snel-seo' ); ?>
+            </button>
+            <span class="snel-seo-translate-status" id="snel-seo-translate-status"></span>
+        </div>
+        <?php endif; ?>
+
+        <?php foreach ( $languages as $lang ) :
+            $code  = $lang['code'];
+            $title = isset( $seo_titles[ $code ] ) ? $seo_titles[ $code ] : '';
+            $desc  = isset( $seo_descs[ $code ] ) ? $seo_descs[ $code ] : '';
+            $is_active = ( $code === $default_lang );
+
+            $preview_title = $title ?: $post->post_title . ' ' . $separator . ' ' . $site_name;
+            $preview_desc  = $desc ?: '';
+
+            $url_parts = explode( '/', trim( wp_parse_url( $permalink, PHP_URL_PATH ) ?: '', '/' ) );
+            $url_path  = implode( ' › ', array_filter( $url_parts ) );
+        ?>
+        <div class="snel-seo-lang-panel <?php echo $is_active ? 'active' : ''; ?>" data-lang="<?php echo esc_attr( $code ); ?>" <?php echo $is_active ? '' : 'style="display:none;"'; ?>>
+
+            <div class="snel-seo-field">
+                <label>
+                    <?php esc_html_e( 'SEO Title', 'snel-seo' ); ?>
+                    <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
+                </label>
+                <input type="text"
+                    name="snel_seo_title[<?php echo esc_attr( $code ); ?>]"
+                    value="<?php echo esc_attr( $title ); ?>"
+                    class="snel-seo-title-input large-text"
+                    data-lang="<?php echo esc_attr( $code ); ?>"
+                    placeholder="<?php echo esc_attr( $post->post_title . ' ' . $separator . ' ' . $site_name ); ?>">
+            </div>
+
+            <div class="snel-seo-field">
+                <label>
+                    <?php esc_html_e( 'Meta Description', 'snel-seo' ); ?>
+                    <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
+                </label>
+                <textarea
+                    name="snel_seo_metadesc[<?php echo esc_attr( $code ); ?>]"
+                    rows="3"
+                    class="snel-seo-desc-input large-text"
+                    data-lang="<?php echo esc_attr( $code ); ?>"
+                    maxlength="320"
+                    placeholder="<?php esc_attr_e( 'Enter a meta description for search results...', 'snel-seo' ); ?>"><?php echo esc_textarea( $desc ); ?></textarea>
+                <div class="snel-seo-char-count" data-lang="<?php echo esc_attr( $code ); ?>">
+                    <span class="snel-seo-char-num"><?php echo mb_strlen( $desc ); ?></span> / 160
+                </div>
+            </div>
+
+            <!-- Google Preview -->
+            <div class="snel-seo-gp" data-lang="<?php echo esc_attr( $code ); ?>">
+                <div class="snel-seo-gp-header">
+                    <svg width="14" height="14" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#34A853" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.77-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.52l7.97-5.93z"/>
+                        <path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.93C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    <span class="snel-seo-gp-header-label"><?php esc_html_e( 'Google Preview', 'snel-seo' ); ?></span>
+                </div>
+                <div class="snel-seo-gp-favicon-row">
+                    <div class="snel-seo-gp-favicon">
+                        <?php if ( $favicon ) : ?>
+                            <img src="<?php echo esc_url( $favicon ); ?>" alt="">
+                        <?php else : ?>
+                            <div style="width:16px;height:16px;background:#ddd;border-radius:2px;"></div>
+                        <?php endif; ?>
+                    </div>
+                    <div>
+                        <div class="snel-seo-gp-domain"><?php echo esc_html( $domain ); ?></div>
+                        <?php if ( $url_path ) : ?>
+                            <div class="snel-seo-gp-path"><?php echo esc_html( $url_path ); ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <div class="snel-seo-gp-title"><?php echo esc_html( $preview_title ); ?></div>
+                <p class="snel-seo-gp-desc"><?php echo esc_html( $preview_desc ?: __( 'No meta description set. Google will auto-generate a snippet from your page content.', 'snel-seo' ) ); ?></p>
+            </div>
+
+
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <script>
+    (function(){
+        var defaultLang = '<?php echo esc_js( $default_lang ); ?>';
+        var currentLang = defaultLang;
+        var postTitle = (document.getElementById('title') || {}).value || '<?php echo esc_js( $post->post_title ); ?>';
+        var siteName = '<?php echo esc_js( $site_name ); ?>';
+        var separator = '<?php echo esc_js( $separator ); ?>';
+        var restUrl = '<?php echo esc_js( $rest_url ); ?>';
+        var nonce = '<?php echo esc_js( $nonce ); ?>';
+        var postId = <?php echo (int) $post->ID; ?>;
+        var languages = <?php echo wp_json_encode( array_map( function( $l ) { return $l['code']; }, $languages ) ); ?>;
+
+        // Listen for title changes.
+        var wpTitle = document.getElementById('title');
+        if (wpTitle) {
+            wpTitle.addEventListener('input', function() {
+                postTitle = this.value;
+                updatePreviews();
+            });
+        }
+
+        // Language switcher.
+        var langBtns = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-btn');
+        var langPanels = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-panel');
+
+        langBtns.forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                currentLang = this.dataset.lang;
+                langBtns.forEach(function(b) { b.classList.remove('active'); });
+                this.classList.add('active');
+                langPanels.forEach(function(p) {
+                    if (p.dataset.lang === currentLang) {
+                        p.style.display = '';
+                        p.classList.add('active');
+                    } else {
+                        p.style.display = 'none';
+                        p.classList.remove('active');
+                    }
+                });
+            });
+        });
+
+        // Character counters + live preview.
+        document.querySelectorAll('.snel-seo-classic .snel-seo-desc-input').forEach(function(textarea) {
+            textarea.addEventListener('input', function() {
+                var count = this.value.length;
+                var counter = document.querySelector('.snel-seo-char-count[data-lang="' + this.dataset.lang + '"]');
+                if (counter) {
+                    counter.querySelector('.snel-seo-char-num').textContent = count;
+                    counter.classList.toggle('over', count > 160);
+                }
+                updatePreviews();
+                updateDots();
+            });
+        });
+
+        document.querySelectorAll('.snel-seo-classic .snel-seo-title-input').forEach(function(input) {
+            input.addEventListener('input', function() {
+                updatePreviews();
+                updateDots();
+            });
+        });
+
+        function updatePreviews() {
+            languages.forEach(function(lang) {
+                var titleInput = document.querySelector('.snel-seo-title-input[data-lang="' + lang + '"]');
+                var descInput = document.querySelector('.snel-seo-desc-input[data-lang="' + lang + '"]');
+                var titleVal = titleInput ? titleInput.value : '';
+                var descVal = descInput ? descInput.value : '';
+
+                var displayTitle = titleVal || (postTitle + ' ' + separator + ' ' + siteName);
+                var displayDesc = descVal || 'No meta description set. Google will auto-generate a snippet from your page content.';
+
+                // Google Preview
+                var gp = document.querySelector('.snel-seo-gp[data-lang="' + lang + '"]');
+                if (gp) {
+                    gp.querySelector('.snel-seo-gp-title').textContent = displayTitle;
+                    gp.querySelector('.snel-seo-gp-desc').textContent = displayDesc;
+                }
+
+            });
+        }
+
+        function updateDots() {
+            langBtns.forEach(function(btn) {
+                var lang = btn.dataset.lang;
+                if (lang === defaultLang) return;
+
+                var titleInput = document.querySelector('.snel-seo-title-input[data-lang="' + lang + '"]');
+                var descInput = document.querySelector('.snel-seo-desc-input[data-lang="' + lang + '"]');
+                var hasTitle = titleInput && titleInput.value.trim();
+                var hasDesc = descInput && descInput.value.trim();
+
+                var dot = btn.querySelector('.snel-seo-dot');
+                if (!dot) {
+                    dot = document.createElement('span');
+                    dot.className = 'snel-seo-dot';
+                    btn.appendChild(dot);
+                }
+
+                dot.className = 'snel-seo-dot';
+                if (hasTitle && hasDesc) {
+                    dot.classList.add('snel-seo-dot-green');
+                } else if (hasTitle || hasDesc) {
+                    dot.classList.add('snel-seo-dot-amber');
+                }
+            });
+        }
+
+        // Translate All.
+        var translateBtn = document.getElementById('snel-seo-translate-all-btn');
+        var translateStatus = document.getElementById('snel-seo-translate-status');
+
+        if (translateBtn) {
+            translateBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                var defaultTitle = document.querySelector('.snel-seo-title-input[data-lang="' + defaultLang + '"]');
+                var defaultDesc = document.querySelector('.snel-seo-desc-input[data-lang="' + defaultLang + '"]');
+                var srcTitle = defaultTitle ? defaultTitle.value.trim() : '';
+                var srcDesc = defaultDesc ? defaultDesc.value.trim() : '';
+
+                if (!srcTitle && !srcDesc) {
+                    translateStatus.textContent = 'Fill in the default language first.';
+                    return;
+                }
+
+                translateBtn.disabled = true;
+                var otherLangs = languages.filter(function(l) { return l !== defaultLang; });
+                var idx = 0;
+
+                function translateNext() {
+                    if (idx >= otherLangs.length) {
+                        translateStatus.textContent = 'All done \u2713';
+                        translateBtn.disabled = false;
+                        setTimeout(function() { translateStatus.textContent = ''; }, 2000);
+                        return;
+                    }
+
+                    var lang = otherLangs[idx];
+                    translateStatus.textContent = '\u2726 Translating ' + lang.toUpperCase() + '...';
+
+                    var promises = [];
+
+                    if (srcTitle) {
+                        promises.push(
+                            fetch(restUrl + '/settings/translate', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+                                body: JSON.stringify({ text: srcTitle, lang: lang, type: 'title' })
+                            }).then(function(r) { return r.json(); }).then(function(data) {
+                                if (data.result) {
+                                    var el = document.querySelector('.snel-seo-title-input[data-lang="' + lang + '"]');
+                                    if (el) el.value = data.result;
+                                }
+                            })
+                        );
+                    }
+
+                    if (srcDesc) {
+                        promises.push(
+                            fetch(restUrl + '/settings/translate', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+                                body: JSON.stringify({ text: srcDesc, lang: lang, type: 'description' })
+                            }).then(function(r) { return r.json(); }).then(function(data) {
+                                if (data.result) {
+                                    var el = document.querySelector('.snel-seo-desc-input[data-lang="' + lang + '"]');
+                                    if (el) el.value = data.result;
+                                }
+                            })
+                        );
+                    }
+
+                    Promise.all(promises).then(function() {
+                        updatePreviews();
+                        updateDots();
+                        idx++;
+                        translateNext();
+                    }).catch(function() {
+                        idx++;
+                        translateNext();
+                    });
+                }
+
+                translateNext();
+            });
+        }
+    })();
+    </script>
+    <?php
+}
+
+/**
+ * Save classic meta box SEO fields on post save.
+ */
+function snel_seo_classic_metabox_save( $post_id ) {
+    if ( ! isset( $_POST['snel_seo_classic_nonce'] ) ) return;
+    if ( ! wp_verify_nonce( $_POST['snel_seo_classic_nonce'], 'snel_seo_classic_metabox' ) ) return;
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
+    if ( ! current_user_can( 'edit_post', $post_id ) ) return;
+
+    if ( isset( $_POST['snel_seo_title'] ) && is_array( $_POST['snel_seo_title'] ) ) {
+        $titles = array();
+        foreach ( $_POST['snel_seo_title'] as $lang => $val ) {
+            $titles[ sanitize_key( $lang ) ] = sanitize_text_field( $val );
+        }
+        update_post_meta( $post_id, '_snel_seo_title', wp_json_encode( $titles ) );
+    }
+
+    if ( isset( $_POST['snel_seo_metadesc'] ) && is_array( $_POST['snel_seo_metadesc'] ) ) {
+        $descs = array();
+        foreach ( $_POST['snel_seo_metadesc'] as $lang => $val ) {
+            $descs[ sanitize_key( $lang ) ] = sanitize_text_field( $val );
+        }
+        update_post_meta( $post_id, '_snel_seo_metadesc', wp_json_encode( $descs ) );
+    }
+}
+add_action( 'save_post', 'snel_seo_classic_metabox_save' );
