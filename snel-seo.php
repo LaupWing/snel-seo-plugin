@@ -31,6 +31,7 @@ $snel_seo_updater->setAuthentication( defined( 'SNEL_SEO_GITHUB_TOKEN' ) ? SNEL_
 $snel_seo_updater->getVcsApi()->enableReleaseAssets();
 
 // Load modules.
+require_once SNEL_SEO_PLUGIN_DIR . 'inc/config.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/languages.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/redirects.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/head-output.php';

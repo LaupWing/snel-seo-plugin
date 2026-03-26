@@ -96,6 +96,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'siteName'     => get_bloginfo( 'name' ),
         'siteDesc'     => get_bloginfo( 'description' ),
         'postTypes'    => snel_seo_get_custom_post_types_with_meta(),
+        'config'       => SnelSeoConfig::to_js(),
     ) );
 } );
 
