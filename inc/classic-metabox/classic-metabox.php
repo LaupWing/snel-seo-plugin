@@ -460,7 +460,7 @@ function snel_seo_classic_metabox_save( $post_id ) {
     if ( isset( $_POST['snel_seo_title'] ) && is_array( $_POST['snel_seo_title'] ) ) {
         $titles = array();
         foreach ( $_POST['snel_seo_title'] as $lang => $val ) {
-            $titles[ sanitize_key( $lang ) ] = sanitize_text_field( $val );
+            $titles[ sanitize_key( $lang ) ] = sanitize_text_field( wp_unslash( $val ) );
         }
         update_post_meta( $post_id, '_snel_seo_title', wp_json_encode( $titles ) );
     }
@@ -468,7 +468,7 @@ function snel_seo_classic_metabox_save( $post_id ) {
     if ( isset( $_POST['snel_seo_metadesc'] ) && is_array( $_POST['snel_seo_metadesc'] ) ) {
         $descs = array();
         foreach ( $_POST['snel_seo_metadesc'] as $lang => $val ) {
-            $descs[ sanitize_key( $lang ) ] = sanitize_text_field( $val );
+            $descs[ sanitize_key( $lang ) ] = sanitize_text_field( wp_unslash( $val ) );
         }
         update_post_meta( $post_id, '_snel_seo_metadesc', wp_json_encode( $descs ) );
     }
