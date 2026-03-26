@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
  * Register admin menu and submenu pages.
  */
 add_action( 'admin_menu', function () {
-    add_menu_page( __( 'Snel SEO', 'snel-seo' ), __( 'Snel SEO', 'snel-seo' ), 'manage_options', 'snel-seo', function () { snel_seo_render_page( 'dashboard' ); }, 'dashicons-search', 27 );
+    add_menu_page( __( 'Snel SEO', 'snel-seo' ), __( 'Snel SEO', 'snel-seo' ), 'manage_options', 'snel-seo', function () { snel_seo_render_page( 'dashboard' ); }, 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDI0IDI0Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjM2I4MmY2Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2MzYWVkIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTIiIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNNi41IDEzYS43LjcgMCAwIDEtLjU1LTEuMTRsNi45My03LjE0YS4zNS4zNSAwIDAgMSAuNi4zMkwxMi4xNCA5LjJhLjcuNyAwIDAgMCAuNjYuOTVoNC45YS43LjcgMCAwIDEgLjU1IDEuMTRsLTYuOTMgNy4xNGEuMzUuMzUgMCAwIDEtLjYtLjMybDEuMzQtNC4yMUEuNy43IDAgMCAwIDExLjQgMTN6IiBmaWxsPSIjZmZmIi8+PC9zdmc+', 27 );
     add_submenu_page( 'snel-seo', __( 'Dashboard', 'snel-seo' ), __( 'Dashboard', 'snel-seo' ), 'manage_options', 'snel-seo', function () { snel_seo_render_page( 'dashboard' ); } );
     add_submenu_page( 'snel-seo', __( 'Settings', 'snel-seo' ), __( 'Settings', 'snel-seo' ), 'manage_options', 'snel-seo-settings', function () { snel_seo_render_page( 'settings' ); } );
     add_submenu_page( 'snel-seo', __( 'Redirects', 'snel-seo' ), __( 'Redirects', 'snel-seo' ), 'manage_options', 'snel-seo-redirects', function () { snel_seo_render_page( 'redirects' ); } );
