@@ -55,9 +55,10 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'metadesc_page' => 'metadesc-page',
     );
     $settings_out = array(
-        'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
-        'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
-        'default_og_image' => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
+        'website_name'         => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
+        'separator'            => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
+        'default_og_image'     => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
+        'post_type_settings'   => get_option( 'snel_seo_post_type_settings', array() ),
     );
     $ml_defaults = array(
         'title_home'    => '%%sitename%% %%separator%% %%sitedesc%%',
@@ -159,6 +160,38 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
     }
 
     update_option( 'wpseo_titles', $settings );
+
+    // Save post type settings (fallback keys + templates per CPT).
+    if ( isset( $params['post_type_settings'] ) && is_array( $params['post_type_settings'] ) ) {
+        $cpt_settings = array();
+        foreach ( $params['post_type_settings'] as $cpt_name => $cpt_config ) {
+            $safe_name = sanitize_key( $cpt_name );
+            $cpt_settings[ $safe_name ] = array();
+
+            // Fallback keys — array of strings.
+            if ( isset( $cpt_config['desc_fallback_keys'] ) && is_array( $cpt_config['desc_fallback_keys'] ) ) {
+                $cpt_settings[ $safe_name ]['desc_fallback_keys'] = array_map( 'sanitize_text_field', $cpt_config['desc_fallback_keys'] );
+            }
+
+            // Title and meta description templates — can be multilingual objects or plain strings.
+            foreach ( array( 'title_template', 'metadesc_template' ) as $tpl_key ) {
+                if ( isset( $cpt_config[ $tpl_key ] ) ) {
+                    $value = $cpt_config[ $tpl_key ];
+                    if ( is_array( $value ) ) {
+                        $sanitized = array();
+                        foreach ( $value as $lang => $text ) {
+                            $sanitized[ sanitize_key( $lang ) ] = sanitize_text_field( $text );
+                        }
+                        $cpt_settings[ $safe_name ][ $tpl_key ] = $sanitized;
+                    } else {
+                        $cpt_settings[ $safe_name ][ $tpl_key ] = sanitize_text_field( $value );
+                    }
+                }
+            }
+        }
+        update_option( 'snel_seo_post_type_settings', $cpt_settings );
+    }
+
     return rest_ensure_response( array( 'success' => true ) );
 }
 
