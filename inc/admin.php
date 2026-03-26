@@ -94,6 +94,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'siteUrl'      => home_url(),
         'siteName'     => get_bloginfo( 'name' ),
         'siteDesc'     => get_bloginfo( 'description' ),
+        'postTypes'    => snel_seo_get_custom_post_types_with_meta(),
     ) );
 } );
 
@@ -222,4 +223,155 @@ function snel_seo_translate_setting( WP_REST_Request $request ) {
     $result = trim( $result, " \t\n\r\0\x0B\"'" );
 
     return rest_ensure_response( array( 'result' => $result ) );
+}
+
+/**
+ * Get all custom post types with their available meta keys from the database.
+ * Excludes built-in types (post, page, attachment) since those have their own tabs.
+ *
+ * Each field is returned with:
+ *   - key:    identifier used for saving config (e.g. '_product_description', '_title_{lang}')
+ *   - label:  human-readable name (e.g. 'Short description', 'Title')
+ *   - type:   'multilingual' (single key, value is array of langs),
+ *             'per_lang' (grouped from _key_nl, _key_de, etc.),
+ *             'plain' (single value)
+ *   - keys:   (per_lang only) map of lang code → meta key
+ */
+function snel_seo_get_custom_post_types_with_meta() {
+    global $wpdb;
+
+    $post_types = get_post_types( array( 'public' => true ), 'objects' );
+    $exclude    = array( 'post', 'page', 'attachment' );
+    $languages  = snel_seo_get_languages();
+    $lang_codes = wp_list_pluck( $languages, 'code' );
+    $result     = array();
+
+    foreach ( $post_types as $pt ) {
+        if ( in_array( $pt->name, $exclude, true ) ) {
+            continue;
+        }
+
+        // Get all distinct meta keys used on published posts of this type.
+        $meta_keys = $wpdb->get_col( $wpdb->prepare(
+            "SELECT DISTINCT pm.meta_key
+             FROM {$wpdb->postmeta} pm
+             INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+             WHERE p.post_type = %s
+               AND p.post_status = 'publish'
+               AND pm.meta_key NOT LIKE %s
+             ORDER BY pm.meta_key ASC",
+            $pt->name,
+            $wpdb->esc_like( '_edit_' ) . '%'
+        ) );
+
+        // Filter out internal WP keys and SEO plugin's own keys.
+        $skip_prefixes = array( '_wp_', '_oembed_', '_encloseme', '_pingme', '_snel_seo_', '_thumbnail_id' );
+        $filtered = array();
+        foreach ( $meta_keys as $key ) {
+            $skip = false;
+            foreach ( $skip_prefixes as $prefix ) {
+                if ( strpos( $key, $prefix ) === 0 ) {
+                    $skip = true;
+                    break;
+                }
+            }
+            if ( ! $skip ) {
+                $filtered[] = $key;
+            }
+        }
+
+        // Detect per-language keys (e.g. _title_nl, _title_de → group as "Title").
+        $per_lang_groups = array(); // base_key => array( lang_code => meta_key )
+        $standalone      = array(); // keys that are not per-language
+
+        foreach ( $filtered as $key ) {
+            $matched = false;
+            foreach ( $lang_codes as $code ) {
+                $suffix = '_' . $code;
+                if ( substr( $key, -strlen( $suffix ) ) === $suffix ) {
+                    $base = substr( $key, 0, -strlen( $suffix ) );
+                    $per_lang_groups[ $base ][ $code ] = $key;
+                    $matched = true;
+                    break;
+                }
+            }
+            if ( ! $matched ) {
+                $standalone[] = $key;
+            }
+        }
+
+        // Only keep per-lang groups that have at least 2 languages.
+        foreach ( $per_lang_groups as $base => $langs ) {
+            if ( count( $langs ) < 2 ) {
+                // Treat as standalone instead.
+                foreach ( $langs as $meta_key ) {
+                    $standalone[] = $meta_key;
+                }
+                unset( $per_lang_groups[ $base ] );
+            }
+        }
+
+        // Sample one published post to detect multilingual arrays.
+        $sample_id = $wpdb->get_var( $wpdb->prepare(
+            "SELECT ID FROM {$wpdb->posts} WHERE post_type = %s AND post_status = 'publish' LIMIT 1",
+            $pt->name
+        ) );
+
+        // Build the final fields list.
+        $fields = array();
+
+        foreach ( $standalone as $key ) {
+            $type = 'plain';
+
+            // Check if value is a serialized multilingual array.
+            if ( $sample_id ) {
+                $val = get_post_meta( $sample_id, $key, true );
+                if ( is_array( $val ) ) {
+                    // Check if keys are language codes.
+                    $val_keys    = array_keys( $val );
+                    $lang_overlap = array_intersect( $val_keys, $lang_codes );
+                    if ( count( $lang_overlap ) >= 2 ) {
+                        $type = 'multilingual';
+                    }
+                }
+            }
+
+            $fields[] = array(
+                'key'   => $key,
+                'label' => snel_seo_meta_key_to_label( $key ),
+                'type'  => $type,
+            );
+        }
+
+        foreach ( $per_lang_groups as $base => $langs ) {
+            $fields[] = array(
+                'key'   => $base . '_{lang}',
+                'label' => snel_seo_meta_key_to_label( $base ),
+                'type'  => 'per_lang',
+                'keys'  => $langs,
+            );
+        }
+
+        $result[] = array(
+            'name'   => $pt->name,
+            'label'  => $pt->labels->name,
+            'fields' => $fields,
+        );
+    }
+
+    return $result;
+}
+
+/**
+ * Convert a meta key to a human-readable label.
+ * e.g. '_product_short_description' → 'Product short description'
+ *      '_event_summary' → 'Event summary'
+ *      '_price' → 'Price'
+ */
+function snel_seo_meta_key_to_label( $key ) {
+    $label = ltrim( $key, '_' );
+    $label = str_replace( '_', ' ', $label );
+    $label = ucfirst( $label );
+
+    return $label;
 }

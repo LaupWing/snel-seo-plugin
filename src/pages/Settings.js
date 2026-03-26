@@ -1,6 +1,6 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Globe, Home, FileText, PenTool, Save, Image, X, Languages } from 'lucide-react';
+import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from '../components/TemplateInput';
 import GooglePreview from '../components/GooglePreview';
@@ -63,6 +63,7 @@ const TABS = [
     { id: 'homepage', label: 'Homepage', icon: Home },
     { id: 'pages', label: 'Pages', icon: FileText },
     { id: 'posts', label: 'Posts', icon: PenTool },
+    { id: 'post_types', label: 'Post Types', icon: Boxes },
 ];
 
 // Keys that should be multilingual
@@ -510,6 +511,283 @@ export default function Settings() {
                         />
                     </div>
                 ) }
+
+                { activeTab === 'post_types' && (
+                    <PostTypesTab
+                        settings={ settings }
+                        setSettings={ setSettings }
+                        isMultilingual={ isMultilingual }
+                        languages={ languages }
+                        defaultLang={ defaultLang }
+                        activeLang={ activeLang }
+                        setActiveLang={ setActiveLang }
+                        previewVars={ previewVars }
+                    />
+                ) }
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Post Types tab — configure SEO templates and description fallback meta keys per custom post type.
+ */
+function PostTypesTab( { settings, setSettings, isMultilingual, languages, defaultLang, activeLang, setActiveLang, previewVars } ) {
+    const postTypes = window.snelSeo?.postTypes || [];
+
+    const [ activeCpt, setActiveCpt ] = useState( postTypes[0]?.name || '' );
+    const currentCpt = postTypes.find( ( pt ) => pt.name === activeCpt );
+
+    // Read/write post type settings from the main settings object.
+    const cptSettings = settings.post_type_settings || {};
+    const getCptConfig = ( cptName ) => cptSettings[ cptName ] || {};
+
+    const updateCptConfig = ( cptName, key, value ) => {
+        setSettings( ( prev ) => ( {
+            ...prev,
+            post_type_settings: {
+                ...( prev.post_type_settings || {} ),
+                [ cptName ]: {
+                    ...( ( prev.post_type_settings || {} )[ cptName ] || {} ),
+                    [ key ]: value,
+                },
+            },
+        } ) );
+    };
+
+    const config = getCptConfig( activeCpt );
+    const descFallbacks = config.desc_fallback_keys || [];
+
+    const addFallbackKey = ( fieldKey ) => {
+        if ( descFallbacks.includes( fieldKey ) ) return;
+        updateCptConfig( activeCpt, 'desc_fallback_keys', [ ...descFallbacks, fieldKey ] );
+    };
+
+    const removeFallbackKey = ( fieldKey ) => {
+        updateCptConfig( activeCpt, 'desc_fallback_keys', descFallbacks.filter( ( k ) => k !== fieldKey ) );
+    };
+
+    const moveFallbackKey = ( index, direction ) => {
+        const newKeys = [ ...descFallbacks ];
+        const swapIndex = index + direction;
+        if ( swapIndex < 0 || swapIndex >= newKeys.length ) return;
+        [ newKeys[ index ], newKeys[ swapIndex ] ] = [ newKeys[ swapIndex ], newKeys[ index ] ];
+        updateCptConfig( activeCpt, 'desc_fallback_keys', newKeys );
+    };
+
+    // Build a lookup from field key to field object for the current CPT.
+    const fields = currentCpt?.fields || [];
+    const fieldMap = {};
+    fields.forEach( ( f ) => { fieldMap[ f.key ] = f; } );
+
+    // Fields not yet selected as fallbacks.
+    const availableFields = fields.filter( ( f ) => ! descFallbacks.includes( f.key ) );
+
+    // Find a field object by its key (may be a selected key not in current fields if data changed).
+    const getField = ( key ) => fieldMap[ key ] || { key, label: key, type: 'plain' };
+
+    // Type badge config.
+    const typeBadge = ( type ) => {
+        if ( type === 'multilingual' ) return { text: 'All languages', className: 'bg-purple-100 text-purple-700 border-purple-200' };
+        if ( type === 'per_lang' ) return { text: 'Per language', className: 'bg-indigo-100 text-indigo-700 border-indigo-200' };
+        return { text: 'Single value', className: 'bg-gray-100 text-gray-600 border-gray-200' };
+    };
+
+    // Get multilingual values for CPT templates.
+    const getCptVal = ( key ) => {
+        const val = config[ key ];
+        if ( ! val ) return '';
+        if ( isMultilingual && typeof val === 'object' ) return val[ activeLang ] || '';
+        if ( typeof val === 'object' ) return val[ defaultLang ] || '';
+        return val || '';
+    };
+
+    const updateCptVal = ( key, value ) => {
+        if ( isMultilingual ) {
+            const current = config[ key ];
+            const obj = ( typeof current === 'object' && current !== null ) ? { ...current } : {};
+            obj[ activeLang ] = value;
+            updateCptConfig( activeCpt, key, obj );
+        } else {
+            updateCptConfig( activeCpt, key, value );
+        }
+    };
+
+    if ( ! postTypes.length ) {
+        return (
+            <div className="text-center py-12 text-gray-400">
+                <Boxes size={ 40 } className="mx-auto mb-3 opacity-50" />
+                <p className="text-sm">{ __( 'No custom post types detected.', 'snel-seo' ) }</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex gap-6">
+            {/* Sidebar — post type list */ }
+            <div className="w-48 shrink-0">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
+                    { __( 'Post Types', 'snel-seo' ) }
+                </p>
+                <div className="space-y-1">
+                    { postTypes.map( ( pt ) => (
+                        <button
+                            key={ pt.name }
+                            onClick={ () => setActiveCpt( pt.name ) }
+                            className={ `w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${ activeCpt === pt.name
+                                ? 'bg-blue-50 text-blue-700 font-medium'
+                                : 'text-gray-600 hover:bg-gray-50'
+                            }` }
+                        >
+                            { pt.label }
+                            <span className="block text-xs text-gray-400 mt-0.5">{ pt.name }</span>
+                        </button>
+                    ) ) }
+                </div>
+            </div>
+
+            {/* Main content */ }
+            <div className="flex-1 space-y-6">
+                {/* Language switcher */ }
+                { isMultilingual && (
+                    <div className="flex items-center gap-1">
+                        { languages.map( ( lang ) => (
+                            <button
+                                key={ lang.code }
+                                onClick={ () => setActiveLang( lang.code ) }
+                                className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
+                                    ? 'bg-blue-600 text-white'
+                                    : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }` }
+                            >
+                                { lang.label }
+                                { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
+                            </button>
+                        ) ) }
+                    </div>
+                ) }
+
+                {/* Title template */ }
+                <TemplateInput
+                    label={ __( 'SEO Title Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                    value={ getCptVal( 'title_template' ) }
+                    onChange={ ( v ) => updateCptVal( 'title_template', v ) }
+                    badgeGroup="page"
+                    defaultValue="%%title%% %%separator%% %%sitename%%"
+                />
+
+                {/* Meta description template */ }
+                <TemplateInput
+                    label={ __( 'Meta Description Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                    value={ getCptVal( 'metadesc_template' ) }
+                    onChange={ ( v ) => updateCptVal( 'metadesc_template', v ) }
+                    badgeGroup="page"
+                    maxLength={ 160 }
+                />
+
+                {/* Google Preview */ }
+                <GooglePreview
+                    title={ resolveTemplate( getCptVal( 'title_template' ) || '%%title%% %%separator%% %%sitename%%', { ...previewVars, title: currentCpt?.label || '' } ) }
+                    url={ window.snelSeo?.siteUrl + '/' + activeCpt + '/example/' }
+                    description={ getCptVal( 'metadesc_template' ) }
+                />
+
+                {/* Description Fallback Fields */ }
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        { __( 'Description Fallback Fields', 'snel-seo' ) }
+                    </label>
+                    <p className="text-xs text-gray-400 mb-3">
+                        { __( 'When no custom SEO description is set, these fields will be tried in order. The correct language is resolved automatically.', 'snel-seo' ) }
+                    </p>
+
+                    {/* Selected fallback fields (ordered) */ }
+                    { descFallbacks.length > 0 ? (
+                        <div className="space-y-1.5 mb-3">
+                            { descFallbacks.map( ( key, index ) => {
+                                const field = getField( key );
+                                const badge = typeBadge( field.type );
+                                return (
+                                    <div
+                                        key={ key }
+                                        className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-sm"
+                                    >
+                                        <span className="text-blue-300 cursor-grab">
+                                            <GripVertical size={ 14 } />
+                                        </span>
+                                        <span className="text-xs font-semibold text-blue-400 w-5">{ index + 1 }.</span>
+                                        <span className="flex-1 flex items-center gap-2">
+                                            <span className="font-medium text-blue-800">{ field.label }</span>
+                                            <span className={ `px-1.5 py-0.5 text-[10px] font-medium rounded border ${ badge.className }` }>
+                                                { badge.text }
+                                            </span>
+                                        </span>
+                                        <div className="flex items-center gap-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={ () => moveFallbackKey( index, -1 ) }
+                                                disabled={ index === 0 }
+                                                className="p-1 text-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                title={ __( 'Move up', 'snel-seo' ) }
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L6 10M6 2L3 5M6 2L9 5" /></svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={ () => moveFallbackKey( index, 1 ) }
+                                                disabled={ index === descFallbacks.length - 1 }
+                                                className="p-1 text-blue-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                title={ __( 'Move down', 'snel-seo' ) }
+                                            >
+                                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 10L6 2M6 10L3 7M6 10L9 7" /></svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={ () => removeFallbackKey( key ) }
+                                                className="p-1 text-blue-400 hover:text-red-500 transition-colors"
+                                                title={ __( 'Remove', 'snel-seo' ) }
+                                            >
+                                                <Trash2 size={ 12 } />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            } ) }
+                        </div>
+                    ) : (
+                        <div className="px-3 py-4 mb-3 border-2 border-dashed border-gray-300 rounded-lg text-center text-xs text-gray-500">
+                            { __( 'No fallback fields selected. The plugin will use excerpt and post content as fallback.', 'snel-seo' ) }
+                        </div>
+                    ) }
+
+                    {/* Available fields to add */ }
+                    { availableFields.length > 0 && (
+                        <div>
+                            <p className="text-xs font-medium text-gray-500 mb-2">
+                                { __( 'Available fields:', 'snel-seo' ) }
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                                { availableFields.map( ( field ) => {
+                                    const badge = typeBadge( field.type );
+                                    return (
+                                        <button
+                                            key={ field.key }
+                                            type="button"
+                                            onClick={ () => addFallbackKey( field.key ) }
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium bg-gray-200 text-gray-700 rounded-lg border border-gray-300 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-colors"
+                                        >
+                                            <Plus size={ 10 } />
+                                            { field.label }
+                                            <span className={ `px-1 py-0.5 text-[10px] rounded border ${ badge.className }` }>
+                                                { badge.text }
+                                            </span>
+                                        </button>
+                                    );
+                                } ) }
+                            </div>
+                        </div>
+                    ) }
+                </div>
             </div>
         </div>
     );
