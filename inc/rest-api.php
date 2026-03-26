@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
  * Generate endpoint registration.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/generate/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/generate/(?P<id>\d+)', array(
         'methods'             => 'POST',
         'callback'            => 'snel_seo_generate_meta',
         'permission_callback' => function ( $request ) { return current_user_can( 'edit_post', $request['id'] ); },
@@ -22,7 +22,7 @@ add_action( 'rest_api_init', function () {
  * Render endpoint — server-side content extraction per language.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/render/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/render/(?P<id>\d+)', array(
         'methods'  => 'GET',
         'callback' => function ( $request ) {
             $post_id = (int) $request['id'];
@@ -75,7 +75,7 @@ add_action( 'rest_api_init', function () {
  * Analyze endpoint — AI-powered SEO check.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/analyze/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/analyze/(?P<id>\d+)', array(
         'methods'  => 'POST',
         'callback' => function ( $request ) {
             $params    = $request->get_json_params();
@@ -86,7 +86,7 @@ add_action( 'rest_api_init', function () {
             $content   = sanitize_textarea_field( $params['content'] ?? '' );
             $url       = esc_url_raw( $params['url'] ?? '' );
 
-            $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+            $api_key = SnelSeoConfig::ai_key();
             if ( empty( $api_key ) ) {
                 return new WP_Error( 'no_api_key', 'OpenAI API key not configured.', array( 'status' => 400 ) );
             }
@@ -104,8 +104,8 @@ add_action( 'rest_api_init', function () {
                 return new WP_Error( 'invalid_check', 'Unknown check type.', array( 'status' => 400 ) );
             }
 
-            $model    = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
-            $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+            $model    = SnelSeoConfig::ai_model();
+            $response = wp_remote_post( SnelSeoConfig::$ai_api_url, array(
                 'timeout' => 30,
                 'headers' => array( 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ),
                 'body'    => wp_json_encode( array(
@@ -114,7 +114,7 @@ add_action( 'rest_api_init', function () {
                         array( 'role' => 'system', 'content' => 'You are an SEO expert analyzing a webpage. ALWAYS respond in English regardless of the content language. Be factual, not subjective. Respond in JSON format only: { "pass": true/false, "message": "short factual assessment (1 sentence)", "suggestion": "specific actionable improvement tip, or empty string if pass is true" }. Be concise.' ),
                         array( 'role' => 'user', 'content' => $prompts[ $check ] ),
                     ),
-                    'temperature'     => 0.3,
+                    'temperature'     => SnelSeoConfig::$ai_temp_analysis,
                     'response_format' => array( 'type' => 'json_object' ),
                 ) ),
             ) );
@@ -145,23 +145,22 @@ add_action( 'rest_api_init', function () {
  * Suggest keyphrases endpoint.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/suggest-keyphrases/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/suggest-keyphrases/(?P<id>\d+)', array(
         'methods'  => 'POST',
         'callback' => function ( $request ) {
             $params  = $request->get_json_params();
             $content = mb_substr( sanitize_textarea_field( $params['content'] ?? '' ), 0, 3000 );
             $lang    = sanitize_text_field( $params['lang'] ?? 'nl' );
 
-            $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+            $api_key = SnelSeoConfig::ai_key();
             if ( empty( $api_key ) ) {
                 return new WP_Error( 'no_api_key', 'OpenAI API key not configured.', array( 'status' => 400 ) );
             }
 
-            $lang_names = array( 'nl' => 'Dutch', 'en' => 'English', 'de' => 'German', 'fr' => 'French', 'es' => 'Spanish', 'it' => 'Italian' );
-            $lang_name  = $lang_names[ $lang ] ?? $lang;
+            $lang_name = SnelSeoConfig::lang_name( $lang );
 
-            $model    = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
-            $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+            $model    = SnelSeoConfig::ai_model();
+            $response = wp_remote_post( SnelSeoConfig::$ai_api_url, array(
                 'timeout' => 30,
                 'headers' => array( 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ),
                 'body'    => wp_json_encode( array(
@@ -170,7 +169,7 @@ add_action( 'rest_api_init', function () {
                         array( 'role' => 'system', 'content' => 'You are an SEO expert. Suggest focus keyphrases that a user would type into Google to find this page. Respond in JSON format only: { "keyphrases": [ { "keyphrase": "the keyphrase", "reason": "why this is a good keyphrase (1 sentence, in English)" } ] }. Return exactly 5 suggestions. The keyphrases must be in ' . $lang_name . '. Keep keyphrases concise (1-4 words). Reasons must always be in English.' ),
                         array( 'role' => 'user', 'content' => "Suggest 5 SEO focus keyphrases in {$lang_name} for this page content. The content includes navigation elements — ignore those and focus on the main body content.\n\nContent:\n{$content}" ),
                     ),
-                    'temperature'     => 0.5,
+                    'temperature'     => SnelSeoConfig::$ai_temp_suggestion,
                     'response_format' => array( 'type' => 'json_object' ),
                 ) ),
             ) );
@@ -201,15 +200,11 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     $type    = $params['type'] ?? 'description';
     $lang    = $params['lang'] ?? snel_seo_get_default_lang();
 
-    $lang_names = array(
-        'nl' => 'Dutch', 'en' => 'English', 'de' => 'German', 'fr' => 'French',
-        'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese', 'ja' => 'Japanese',
-        'zh' => 'Chinese', 'ko' => 'Korean', 'ar' => 'Arabic', 'ru' => 'Russian',
-        'pl' => 'Polish', 'tr' => 'Turkish', 'sv' => 'Swedish',
-    );
-    $lang_name = $lang_names[ $lang ] ?? $lang;
+    $lang_name     = SnelSeoConfig::lang_name( $lang );
+    $max_title     = SnelSeoConfig::$max_title_length;
+    $max_desc      = SnelSeoConfig::$max_desc_length;
 
-    $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+    $api_key = SnelSeoConfig::ai_key();
     if ( empty( $api_key ) ) {
         return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Go to Snelstack Settings to add your key.', array( 'status' => 400 ) );
     }
@@ -235,14 +230,14 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     $content = mb_substr( $content, 0, 3000 );
     $title   = $post->post_title;
 
-    $settings  = get_option( 'wpseo_titles', array() );
+    $settings  = get_option( SnelSeoConfig::$option_titles, array() );
     $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
     $separator = snel_seo_get_separator();
 
     if ( 'title' === $type ) {
         $prompt = "Generate an SEO-optimized title in {$lang_name} for the following page. "
                 . "The format should be: [compelling page title] {$separator} {$site_name}. "
-                . "The total length must be under 60 characters including the separator and site name. "
+                . "The total length must be under {$max_title} characters including the separator and site name. "
                 . "Write in {$lang_name}. Return ONLY the full title with separator and site name, nothing else.\n\n"
                 . "Page title: {$title}\nPage content: {$content}";
     } elseif ( 'keyphrase' === $type ) {
@@ -252,13 +247,13 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
                 . "Return ONLY the translated keyphrase, nothing else.\n\nKeyphrase: {$source_kw}";
     } else {
         $prompt = "Generate an SEO-optimized meta description in {$lang_name} for the following page. "
-                . "Keep it between 120-155 characters. Make it compelling and include a call to action if appropriate. "
+                . "Keep it between 120-{$max_desc} characters. Make it compelling and include a call to action if appropriate. "
                 . "Write in {$lang_name}. Return ONLY the meta description, nothing else.\n\n"
                 . "Page title: {$title}\nPage content: {$content}";
     }
 
-    $model    = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
-    $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+    $model    = SnelSeoConfig::ai_model();
+    $response = wp_remote_post( SnelSeoConfig::$ai_api_url, array(
         'timeout' => 30,
         'headers' => array( 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ),
         'body'    => wp_json_encode( array(
@@ -267,7 +262,7 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
                 array( 'role' => 'system', 'content' => 'You are an SEO expert. Write concise, compelling meta content that drives clicks from search results.' ),
                 array( 'role' => 'user', 'content' => $prompt ),
             ),
-            'temperature' => 0.7,
+            'temperature' => SnelSeoConfig::$ai_temp_generation,
         ) ),
     ) );
 

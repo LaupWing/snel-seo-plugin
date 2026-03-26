@@ -3,6 +3,7 @@ import { useSelect, useDispatch } from '@wordpress/data';
 import { __ } from '@wordpress/i18n';
 import { Search, Share2, Settings, Sparkles, Languages, Target } from 'lucide-react';
 import { Tooltip } from '@wordpress/components';
+import { getSeparatorChar } from '../config';
 import TemplateInput from './TemplateInput';
 import GooglePreview from './GooglePreview';
 import Tabs from './Tabs';
@@ -225,10 +226,7 @@ export default function SeoMetaBox() {
 
     // Resolve preview
     const settings = window.snelSeoEditor?.settings || {};
-    const sepChar = {
-        'sc-dash': '–', 'sc-hyphen': '-', 'sc-pipe': '|',
-        'sc-middot': '·', 'sc-bullet': '•', 'sc-raquo': '»', 'sc-slash': '/',
-    }[ settings.separator ] || '–';
+    const sepChar = getSeparatorChar( settings.separator );
 
     const siteName = settings.website_name || '';
     const currentTitle = seoTitle[ activeLang ] || '';

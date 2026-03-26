@@ -11,18 +11,7 @@ defined( 'ABSPATH' ) || exit;
  * Get the separator character.
  */
 function snel_seo_get_separator() {
-    $settings = get_option( 'wpseo_titles', array() );
-    $sep_key  = isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash';
-    $map      = array(
-        'sc-dash'   => '–',
-        'sc-hyphen' => '-',
-        'sc-pipe'   => '|',
-        'sc-middot' => '·',
-        'sc-bullet' => '•',
-        'sc-raquo'  => '»',
-        'sc-slash'  => '/',
-    );
-    return isset( $map[ $sep_key ] ) ? $map[ $sep_key ] : '–';
+    return SnelSeoConfig::get_separator();
 }
 
 /**
@@ -74,7 +63,7 @@ function snel_seo_get_ml_setting( $settings, $key, $fallback = '' ) {
  * Get template variables for the current page context.
  */
 function snel_seo_get_vars() {
-    $settings = get_option( 'wpseo_titles', array() );
+    $settings = get_option( SnelSeoConfig::$option_titles, array() );
     return array(
         'sitename'  => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
         'sitedesc'  => get_bloginfo( 'description' ),
@@ -135,7 +124,7 @@ function snel_seo_resolve_meta_field( $post_id, $field_key ) {
  * Get the CPT settings config for a given post type.
  */
 function snel_seo_get_cpt_config( $post_type ) {
-    $cpt_settings = get_option( 'snel_seo_post_type_settings', array() );
+    $cpt_settings = get_option( SnelSeoConfig::$option_cpt, array() );
     return isset( $cpt_settings[ $post_type ] ) ? $cpt_settings[ $post_type ] : array();
 }
 
@@ -159,12 +148,12 @@ function snel_seo_get_cpt_template( $config, $key ) {
  * Filter the document title.
  */
 add_filter( 'pre_get_document_title', function ( $title ) {
-    $settings = get_option( 'wpseo_titles', array() );
+    $settings = get_option( SnelSeoConfig::$option_titles, array() );
     $vars     = snel_seo_get_vars();
 
     if ( is_singular() ) {
         $post_id  = get_queried_object_id();
-        $raw      = get_post_meta( $post_id, '_snel_seo_title', true );
+        $raw      = get_post_meta( $post_id, SnelSeoConfig::$meta_title, true );
         $titles   = $raw ? json_decode( $raw, true ) : array();
         $lang     = snel_seo_get_current_lang();
         $default  = snel_seo_get_default_lang();
@@ -253,7 +242,7 @@ function snel_seo_auto_description( $post_id ) {
     }
 
     // 4. Title + site name.
-    $settings  = get_option( 'wpseo_titles', array() );
+    $settings  = get_option( SnelSeoConfig::$option_titles, array() );
     $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
     return get_the_title( $post_id ) . ' — ' . $site_name;
 }
@@ -289,7 +278,7 @@ add_action( 'wp_head', function () {
  * Output meta description and Open Graph tags.
  */
 add_action( 'wp_head', function () {
-    $settings = get_option( 'wpseo_titles', array() );
+    $settings = get_option( SnelSeoConfig::$option_titles, array() );
     $vars     = snel_seo_get_vars();
 
     // Meta Description.
@@ -297,7 +286,7 @@ add_action( 'wp_head', function () {
 
     if ( is_singular() ) {
         $post_id = get_queried_object_id();
-        $raw     = get_post_meta( $post_id, '_snel_seo_metadesc', true );
+        $raw     = get_post_meta( $post_id, SnelSeoConfig::$meta_desc, true );
         $descs   = $raw ? json_decode( $raw, true ) : array();
         $lang    = snel_seo_get_current_lang();
         $default = snel_seo_get_default_lang();
@@ -382,7 +371,7 @@ add_action( 'wp_head', function () {
  * JSON-LD structured data.
  */
 add_action( 'wp_head', function () {
-    $settings  = get_option( 'wpseo_titles', array() );
+    $settings  = get_option( SnelSeoConfig::$option_titles, array() );
     $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
     $site_url  = home_url( '/' );
     $og_image  = isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '';

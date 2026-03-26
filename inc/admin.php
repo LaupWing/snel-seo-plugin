@@ -39,7 +39,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
     wp_enqueue_style( 'snel-seo-admin', SNEL_SEO_PLUGIN_URL . 'build/index.css', array( 'wp-components' ), $asset['version'] );
     wp_enqueue_media();
 
-    $settings = get_option( 'wpseo_titles', array() );
+    $settings = get_option( SnelSeoConfig::$option_titles, array() );
 
     $languages    = snel_seo_get_languages();
     $default_lang = snel_seo_get_default_lang();
@@ -58,7 +58,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'website_name'         => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
         'separator'            => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
         'default_og_image'     => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
-        'post_type_settings'   => get_option( 'snel_seo_post_type_settings', array() ),
+        'post_type_settings'   => get_option( SnelSeoConfig::$option_cpt, array() ),
     );
     $ml_defaults = array(
         'title_home'    => '%%sitename%% %%separator%% %%sitedesc%%',
@@ -84,7 +84,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
     }
 
     wp_localize_script( 'snel-seo-admin', 'snelSeo', array(
-        'restUrl'      => rest_url( 'snel-seo/v1' ),
+        'restUrl'      => rest_url( SnelSeoConfig::$rest_namespace ),
         'nonce'        => wp_create_nonce( 'wp_rest' ),
         'version'      => SNEL_SEO_VERSION,
         'settings'     => $settings_out,
@@ -104,13 +104,13 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
  * Settings save endpoint.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/settings', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/settings', array(
         'methods'             => 'POST',
         'callback'            => 'snel_seo_save_settings',
         'permission_callback' => function () { return current_user_can( 'manage_options' ); },
     ) );
 
-    register_rest_route( 'snel-seo/v1', '/settings/translate', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/settings/translate', array(
         'methods'             => 'POST',
         'callback'            => 'snel_seo_translate_setting',
         'permission_callback' => function () { return current_user_can( 'manage_options' ); },
@@ -119,7 +119,7 @@ add_action( 'rest_api_init', function () {
 
 function snel_seo_save_settings( WP_REST_Request $request ) {
     $params   = $request->get_json_params();
-    $settings = get_option( 'wpseo_titles', array() );
+    $settings = get_option( SnelSeoConfig::$option_titles, array() );
 
     // Keys that stay as plain strings.
     $plain_keys = array(
@@ -160,7 +160,7 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
         }
     }
 
-    update_option( 'wpseo_titles', $settings );
+    update_option( SnelSeoConfig::$option_titles, $settings );
 
     // Save post type settings (fallback keys + templates per CPT).
     if ( isset( $params['post_type_settings'] ) && is_array( $params['post_type_settings'] ) ) {
@@ -190,7 +190,7 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
                 }
             }
         }
-        update_option( 'snel_seo_post_type_settings', $cpt_settings );
+        update_option( SnelSeoConfig::$option_cpt, $cpt_settings );
     }
 
     return rest_ensure_response( array( 'success' => true ) );
@@ -209,42 +209,37 @@ function snel_seo_translate_setting( WP_REST_Request $request ) {
         return new WP_Error( 'missing_params', 'Text and lang are required.', array( 'status' => 400 ) );
     }
 
-    $api_key = function_exists( 'snelstack_get_openai_key' ) ? snelstack_get_openai_key() : '';
+    $api_key = SnelSeoConfig::ai_key();
     if ( empty( $api_key ) ) {
         return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Go to Snelstack Settings to add your key.', array( 'status' => 400 ) );
     }
 
-    $lang_names = array(
-        'nl' => 'Dutch', 'en' => 'English', 'de' => 'German', 'fr' => 'French',
-        'es' => 'Spanish', 'it' => 'Italian', 'pt' => 'Portuguese', 'ja' => 'Japanese',
-        'zh' => 'Chinese', 'ko' => 'Korean', 'ar' => 'Arabic', 'ru' => 'Russian',
-        'pl' => 'Polish', 'tr' => 'Turkish', 'sv' => 'Swedish',
-    );
-    $lang_name = $lang_names[ $lang ] ?? $lang;
+    $lang_name     = SnelSeoConfig::lang_name( $lang );
+    $max_title     = SnelSeoConfig::$max_title_length;
+    $max_desc      = SnelSeoConfig::$max_desc_length;
 
     if ( 'title' === $type ) {
         $prompt = "Translate this SEO title template to {$lang_name}. "
                 . "Keep template variables like %%sitename%%, %%separator%%, %%sitedesc%%, %%title%% exactly as they are — do not translate them. "
-                . "Only translate the human-readable text parts. Keep it under 60 characters. "
+                . "Only translate the human-readable text parts. Keep it under {$max_title} characters. "
                 . "Return ONLY the translated title, nothing else.\n\nTitle: {$text}";
     } else {
         $prompt = "Translate this SEO meta description to {$lang_name}. "
                 . "Keep template variables like %%sitename%%, %%sitedesc%% exactly as they are — do not translate them. "
-                . "Only translate the human-readable text parts. Keep it between 120-155 characters. "
+                . "Only translate the human-readable text parts. Keep it between 120-{$max_desc} characters. "
                 . "Return ONLY the translated description, nothing else.\n\nDescription: {$text}";
     }
 
-    $model    = function_exists( 'snelstack_get_openai_model' ) ? snelstack_get_openai_model() : 'gpt-4o-mini';
-    $response = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+    $response = wp_remote_post( SnelSeoConfig::$ai_api_url, array(
         'timeout' => 30,
         'headers' => array( 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ),
         'body'    => wp_json_encode( array(
-            'model'       => $model,
+            'model'       => SnelSeoConfig::ai_model(),
             'messages'    => array(
                 array( 'role' => 'system', 'content' => 'You are a professional translator specializing in SEO content. Translate accurately while preserving template variables.' ),
                 array( 'role' => 'user', 'content' => $prompt ),
             ),
-            'temperature' => 0.3,
+            'temperature' => SnelSeoConfig::$ai_temp_translation,
         ) ),
     ) );
 
@@ -299,7 +294,7 @@ function snel_seo_get_custom_post_types_with_meta() {
         ) );
 
         // Filter out internal WP keys and SEO plugin's own keys.
-        $skip_prefixes = array( '_wp_', '_oembed_', '_encloseme', '_pingme', '_snel_seo_', '_thumbnail_id' );
+        $skip_prefixes = SnelSeoConfig::$meta_skip_prefixes;
         $filtered = array();
         foreach ( $meta_keys as $key ) {
             $skip = false;

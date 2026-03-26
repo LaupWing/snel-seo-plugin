@@ -5,21 +5,7 @@ import { Tooltip } from '@wordpress/components';
 import TemplateInput from '../components/TemplateInput';
 import GooglePreview from '../components/GooglePreview';
 import Tabs from '../components/Tabs';
-
-const SEPARATORS = [
-    { label: '–', value: 'sc-dash' },
-    { label: '-', value: 'sc-hyphen' },
-    { label: '|', value: 'sc-pipe' },
-    { label: '·', value: 'sc-middot' },
-    { label: '•', value: 'sc-bullet' },
-    { label: '»', value: 'sc-raquo' },
-    { label: '/', value: 'sc-slash' },
-];
-
-function getSeparatorChar( value ) {
-    const sep = SEPARATORS.find( ( s ) => s.value === value );
-    return sep ? sep.label : '–';
-}
+import { SEPARATORS, getSeparatorChar, DEFAULT_TEMPLATES, MULTILINGUAL_KEYS, MAX_DESC_LENGTH } from '../config';
 
 function resolveTemplate( template, vars ) {
     let result = template;
@@ -66,8 +52,7 @@ const TABS = [
     { id: 'post_types', label: 'Post Types', icon: Boxes },
 ];
 
-// Keys that should be multilingual
-const MULTILINGUAL_KEYS = [ 'title_home', 'metadesc_home', 'title_page', 'metadesc_page', 'title_post', 'metadesc_post' ];
+// MULTILINGUAL_KEYS imported from config.js
 
 export default function Settings() {
     const initial = window.snelSeo?.settings || {};
@@ -85,14 +70,7 @@ export default function Settings() {
     // Pre-fill empty languages with default language values on mount.
     useState( () => {
         if ( ! isMultilingual ) return;
-        const defaults = {
-            title_home: '%%sitename%% %%separator%% %%sitedesc%%',
-            metadesc_home: '',
-            title_page: '%%title%% %%separator%% %%sitename%%',
-            metadesc_page: '',
-            title_post: '%%title%% %%separator%% %%sitename%%',
-            metadesc_post: '',
-        };
+        const defaults = DEFAULT_TEMPLATES;
         setSettings( ( prev ) => {
             const next = { ...prev };
             let changed = false;
@@ -454,7 +432,7 @@ export default function Settings() {
                             value={ getVal( 'metadesc_home' ) }
                             onChange={ ( v ) => update( 'metadesc_home', v ) }
                             badgeGroup="homepage"
-                            maxLength={ 160 }
+                            maxLength={ MAX_DESC_LENGTH }
                         />
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
@@ -478,7 +456,7 @@ export default function Settings() {
                             value={ getVal( 'metadesc_page' ) }
                             onChange={ ( v ) => update( 'metadesc_page', v ) }
                             badgeGroup="page"
-                            maxLength={ 160 }
+                            maxLength={ MAX_DESC_LENGTH }
                         />
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_page' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
@@ -502,7 +480,7 @@ export default function Settings() {
                             value={ getVal( 'metadesc_post' ) }
                             onChange={ ( v ) => update( 'metadesc_post', v ) }
                             badgeGroup="post"
-                            maxLength={ 160 }
+                            maxLength={ MAX_DESC_LENGTH }
                         />
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_post' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
@@ -682,7 +660,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     value={ getCptVal( 'metadesc_template' ) }
                     onChange={ ( v ) => updateCptVal( 'metadesc_template', v ) }
                     badgeGroup="page"
-                    maxLength={ 160 }
+                    maxLength={ MAX_DESC_LENGTH }
                 />
 
                 {/* Google Preview */ }

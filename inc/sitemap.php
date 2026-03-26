@@ -11,7 +11,7 @@ defined( 'ABSPATH' ) || exit;
  * Get sitemap settings.
  */
 function snel_seo_sitemap_settings() {
-    return wp_parse_args( get_option( 'snel_seo_sitemap', array() ), array(
+    return wp_parse_args( get_option( SnelSeoConfig::$option_sitemap, array() ), array(
         'enabled'          => false,   // false = use WP default, true = use custom
         'include_pages'    => true,
         'include_posts'    => true,
@@ -150,7 +150,7 @@ function snel_seo_render_sitemap( $type, $settings ) {
  */
 add_action( 'rest_api_init', function () {
     // Get settings.
-    register_rest_route( 'snel-seo/v1', '/sitemap/settings', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/sitemap/settings', array(
         array(
             'methods'             => 'GET',
             'callback'            => function () {
@@ -182,7 +182,7 @@ add_action( 'rest_api_init', function () {
                     $settings['excluded_ids'] = array_map( 'intval', $params['excluded_ids'] );
                 }
 
-                update_option( 'snel_seo_sitemap', $settings );
+                update_option( SnelSeoConfig::$option_sitemap, $settings );
 
                 // Flush rewrite rules when toggling custom sitemap.
                 flush_rewrite_rules();
@@ -196,7 +196,7 @@ add_action( 'rest_api_init', function () {
     ) );
 
     // Preview — return URLs that would be in the sitemap.
-    register_rest_route( 'snel-seo/v1', '/sitemap/preview', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/sitemap/preview', array(
         'methods'  => 'GET',
         'callback' => function () {
             $settings = snel_seo_sitemap_settings();

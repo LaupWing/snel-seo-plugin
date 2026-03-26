@@ -2,29 +2,11 @@ import { useRef } from '@wordpress/element';
 import { Tooltip } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import { RotateCcw } from 'lucide-react';
-
-const BADGE_GROUPS = {
-    homepage: [
-        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
-        { label: 'Tagline', value: '%%sitedesc%%', tip: 'Your site tagline from Settings > General' },
-        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. – | /)' },
-    ],
-    page: [
-        { label: 'Page Title', value: '%%title%%', tip: 'The title of the current page' },
-        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
-        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. – | /)' },
-    ],
-    post: [
-        { label: 'Post Title', value: '%%title%%', tip: 'The title of the current post' },
-        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
-        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. – | /)' },
-        { label: 'Category', value: '%%category%%', tip: 'The primary category of the post' },
-    ],
-};
+import { TEMPLATE_BADGES } from '../config';
 
 export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action, placeholder } ) {
     const inputRef = useRef( null );
-    const badges = BADGE_GROUPS[ badgeGroup ] || BADGE_GROUPS.page;
+    const badges = TEMPLATE_BADGES[ badgeGroup ] || TEMPLATE_BADGES.page;
 
     const insertVariable = ( variable ) => {
         const input = inputRef.current;

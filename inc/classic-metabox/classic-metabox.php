@@ -69,18 +69,13 @@ function snel_seo_classic_metabox_render( $post ) {
     $default_lang = snel_seo_get_default_lang();
     $multilingual = snel_seo_is_multilingual();
 
-    $settings  = get_option( 'wpseo_titles', array() );
+    $settings  = get_option( SnelSeoConfig::$option_titles, array() );
     $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
-    $sep_key   = isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash';
-    $sep_map   = array(
-        'sc-dash' => "\xe2\x80\x93", 'sc-hyphen' => '-', 'sc-pipe' => '|',
-        'sc-middot' => "\xc2\xb7", 'sc-bullet' => "\xe2\x80\xa2", 'sc-raquo' => "\xc2\xbb", 'sc-slash' => '/',
-    );
-    $separator = isset( $sep_map[ $sep_key ] ) ? $sep_map[ $sep_key ] : "\xe2\x80\x93";
+    $separator = SnelSeoConfig::get_separator();
 
     // Load existing SEO meta.
-    $raw_title = get_post_meta( $post->ID, '_snel_seo_title', true );
-    $raw_desc  = get_post_meta( $post->ID, '_snel_seo_metadesc', true );
+    $raw_title = get_post_meta( $post->ID, SnelSeoConfig::$meta_title, true );
+    $raw_desc  = get_post_meta( $post->ID, SnelSeoConfig::$meta_desc, true );
     $seo_titles = $raw_title ? json_decode( $raw_title, true ) : array();
     $seo_descs  = $raw_desc ? json_decode( $raw_desc, true ) : array();
 
@@ -103,7 +98,7 @@ function snel_seo_classic_metabox_render( $post ) {
 
     $permalink    = get_permalink( $post->ID );
     $nonce        = wp_create_nonce( 'wp_rest' );
-    $rest_url     = rest_url( 'snel-seo/v1' );
+    $rest_url     = rest_url( SnelSeoConfig::$rest_namespace );
     $favicon      = get_site_icon_url( 28 );
     $featured_img = get_the_post_thumbnail_url( $post->ID, 'large' );
     $og_image     = $featured_img ?: ( isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '' );

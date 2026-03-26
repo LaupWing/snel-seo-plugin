@@ -46,7 +46,7 @@ add_action( 'enqueue_block_editor_assets', function () {
     wp_enqueue_script( 'snel-seo-editor', SNEL_SEO_PLUGIN_URL . 'build/editor.js', $asset['dependencies'], $asset['version'], true );
     wp_enqueue_style( 'snel-seo-editor', SNEL_SEO_PLUGIN_URL . 'build/editor.css', array( 'wp-components' ), $asset['version'] );
 
-    $settings  = get_option( 'wpseo_titles', array() );
+    $settings  = get_option( SnelSeoConfig::$option_titles, array() );
     $languages = snel_seo_get_languages();
 
     wp_localize_script( 'snel-seo-editor', 'snelSeoEditor', array(
@@ -71,14 +71,14 @@ add_action( 'enqueue_block_editor_assets', function () {
  * Post meta REST endpoints.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/post-meta/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/post-meta/(?P<id>\d+)', array(
         array(
             'methods'  => 'GET',
             'callback' => function ( $request ) {
                 $post_id   = (int) $request['id'];
-                $seo_title = get_post_meta( $post_id, '_snel_seo_title', true );
-                $metadesc  = get_post_meta( $post_id, '_snel_seo_metadesc', true );
-                $focus_kw  = get_post_meta( $post_id, '_snel_seo_focus_kw', true );
+                $seo_title = get_post_meta( $post_id, SnelSeoConfig::$meta_title, true );
+                $metadesc  = get_post_meta( $post_id, SnelSeoConfig::$meta_desc, true );
+                $focus_kw  = get_post_meta( $post_id, SnelSeoConfig::$meta_keyphrase, true );
 
                 return rest_ensure_response( array(
                     'seo_title' => $seo_title ? json_decode( $seo_title, true ) : new \stdClass(),
@@ -94,9 +94,9 @@ add_action( 'rest_api_init', function () {
                 $post_id = (int) $request['id'];
                 $params  = $request->get_json_params();
 
-                if ( isset( $params['seo_title'] ) ) update_post_meta( $post_id, '_snel_seo_title', wp_json_encode( $params['seo_title'] ) );
-                if ( isset( $params['metadesc'] ) ) update_post_meta( $post_id, '_snel_seo_metadesc', wp_json_encode( $params['metadesc'] ) );
-                if ( isset( $params['focus_kw'] ) ) update_post_meta( $post_id, '_snel_seo_focus_kw', wp_json_encode( $params['focus_kw'] ) );
+                if ( isset( $params['seo_title'] ) ) update_post_meta( $post_id, SnelSeoConfig::$meta_title, wp_json_encode( $params['seo_title'] ) );
+                if ( isset( $params['metadesc'] ) ) update_post_meta( $post_id, SnelSeoConfig::$meta_desc, wp_json_encode( $params['metadesc'] ) );
+                if ( isset( $params['focus_kw'] ) ) update_post_meta( $post_id, SnelSeoConfig::$meta_keyphrase, wp_json_encode( $params['focus_kw'] ) );
 
                 return rest_ensure_response( array( 'success' => true ) );
             },
@@ -110,7 +110,7 @@ add_action( 'rest_api_init', function () {
  */
 add_action( 'init', function () {
     $post_types = get_post_types( array( 'public' => true ) );
-    $meta_keys  = array( '_snel_seo_title', '_snel_seo_metadesc', '_snel_seo_focus_kw' );
+    $meta_keys  = array( SnelSeoConfig::$meta_title, SnelSeoConfig::$meta_desc, SnelSeoConfig::$meta_keyphrase );
 
     foreach ( $post_types as $post_type ) {
         foreach ( $meta_keys as $key ) {

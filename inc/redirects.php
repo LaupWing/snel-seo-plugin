@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
  */
 function snel_seo_create_redirects_table() {
     global $wpdb;
-    $table   = $wpdb->prefix . 'snel_seo_redirects';
+    $table   = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
     $charset = $wpdb->get_charset_collate();
 
     $sql = "CREATE TABLE $table (
@@ -33,7 +33,7 @@ function snel_seo_create_redirects_table() {
 // Create table on admin init if it doesn't exist.
 add_action( 'admin_init', function () {
     global $wpdb;
-    $table = $wpdb->prefix . 'snel_seo_redirects';
+    $table = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
     if ( $wpdb->get_var( "SHOW TABLES LIKE '$table'" ) !== $table ) {
         snel_seo_create_redirects_table();
     }
@@ -44,7 +44,7 @@ add_action( 'admin_init', function () {
  */
 function snel_seo_create_404_log_table() {
     global $wpdb;
-    $table   = $wpdb->prefix . 'snel_seo_404_log';
+    $table   = SnelSeoConfig::table( SnelSeoConfig::$table_404_log );
     $charset = $wpdb->get_charset_collate();
 
     $sql = "CREATE TABLE $table (
@@ -66,7 +66,7 @@ function snel_seo_create_404_log_table() {
 // Create 404 table on admin init if it doesn't exist.
 add_action( 'admin_init', function () {
     global $wpdb;
-    $table = $wpdb->prefix . 'snel_seo_404_log';
+    $table = SnelSeoConfig::table( SnelSeoConfig::$table_404_log );
     if ( $wpdb->get_var( "SHOW TABLES LIKE '$table'" ) !== $table ) {
         snel_seo_create_404_log_table();
     }
@@ -77,7 +77,7 @@ add_action( 'admin_init', function () {
  */
 add_action( 'template_redirect', function () {
     global $wpdb;
-    $table = $wpdb->prefix . 'snel_seo_redirects';
+    $table = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
 
     $request_path = '/' . trim( wp_parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
     if ( empty( $request_path ) || $request_path === '/' ) return;
@@ -99,7 +99,7 @@ add_action( 'template_redirect', function () {
 
     // Log 404s.
     if ( is_404() ) {
-        $log_table  = $wpdb->prefix . 'snel_seo_404_log';
+        $log_table  = SnelSeoConfig::table( SnelSeoConfig::$table_404_log );
         $referrer   = isset( $_SERVER['HTTP_REFERER'] ) ? esc_url_raw( $_SERVER['HTTP_REFERER'] ) : '';
         $user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( substr( $_SERVER['HTTP_USER_AGENT'], 0, 500 ) ) : '';
 
@@ -127,12 +127,12 @@ add_action( 'template_redirect', function () {
  * REST endpoints for redirects CRUD.
  */
 add_action( 'rest_api_init', function () {
-    register_rest_route( 'snel-seo/v1', '/redirects', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/redirects', array(
         array(
             'methods'             => 'GET',
             'callback'            => function () {
                 global $wpdb;
-                $table   = $wpdb->prefix . 'snel_seo_redirects';
+                $table   = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
                 $results = $wpdb->get_results( "SELECT * FROM $table ORDER BY created_at DESC", ARRAY_A );
                 return rest_ensure_response( $results ?: array() );
             },
@@ -144,7 +144,7 @@ add_action( 'rest_api_init', function () {
             'methods'             => 'POST',
             'callback'            => function ( $request ) {
                 global $wpdb;
-                $table  = $wpdb->prefix . 'snel_seo_redirects';
+                $table  = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
                 $params = $request->get_json_params();
 
                 $source = isset( $params['source_url'] ) ? sanitize_text_field( $params['source_url'] ) : '';
@@ -172,12 +172,12 @@ add_action( 'rest_api_init', function () {
         ),
     ) );
 
-    register_rest_route( 'snel-seo/v1', '/redirects/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/redirects/(?P<id>\d+)', array(
         array(
             'methods'             => 'PUT',
             'callback'            => function ( $request ) {
                 global $wpdb;
-                $table  = $wpdb->prefix . 'snel_seo_redirects';
+                $table  = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
                 $params = $request->get_json_params();
                 $id     = (int) $request['id'];
 
@@ -207,7 +207,7 @@ add_action( 'rest_api_init', function () {
             'methods'             => 'DELETE',
             'callback'            => function ( $request ) {
                 global $wpdb;
-                $table = $wpdb->prefix . 'snel_seo_redirects';
+                $table = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
                 $wpdb->delete( $table, array( 'id' => (int) $request['id'] ) );
                 return rest_ensure_response( array( 'success' => true ) );
             },
@@ -218,11 +218,11 @@ add_action( 'rest_api_init', function () {
     ) );
 
     // Bulk import.
-    register_rest_route( 'snel-seo/v1', '/redirects/import', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/redirects/import', array(
         'methods'             => 'POST',
         'callback'            => function ( $request ) {
             global $wpdb;
-            $table    = $wpdb->prefix . 'snel_seo_redirects';
+            $table    = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
             $mappings = $request->get_json_params();
 
             if ( ! is_array( $mappings ) ) {
@@ -274,11 +274,11 @@ add_action( 'rest_api_init', function () {
     ) );
 
     // Bulk delete all.
-    register_rest_route( 'snel-seo/v1', '/redirects/all', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/redirects/all', array(
         'methods'             => 'DELETE',
         'callback'            => function () {
             global $wpdb;
-            $table = $wpdb->prefix . 'snel_seo_redirects';
+            $table = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
             $wpdb->query( "TRUNCATE TABLE $table" );
             return rest_ensure_response( array( 'success' => true ) );
         },
@@ -288,11 +288,11 @@ add_action( 'rest_api_init', function () {
     ) );
 
     // 404 Log — list all.
-    register_rest_route( 'snel-seo/v1', '/404-log', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/404-log', array(
         'methods'             => 'GET',
         'callback'            => function () {
             global $wpdb;
-            $table = $wpdb->prefix . 'snel_seo_404_log';
+            $table = SnelSeoConfig::table( SnelSeoConfig::$table_404_log );
             $results = $wpdb->get_results( "SELECT * FROM $table ORDER BY last_seen DESC", ARRAY_A );
             return rest_ensure_response( $results ?: array() );
         },
@@ -302,11 +302,11 @@ add_action( 'rest_api_init', function () {
     ) );
 
     // 404 Log — delete single entry.
-    register_rest_route( 'snel-seo/v1', '/404-log/(?P<id>\d+)', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/404-log/(?P<id>\d+)', array(
         'methods'             => 'DELETE',
         'callback'            => function ( $request ) {
             global $wpdb;
-            $table = $wpdb->prefix . 'snel_seo_404_log';
+            $table = SnelSeoConfig::table( SnelSeoConfig::$table_404_log );
             $wpdb->delete( $table, array( 'id' => (int) $request['id'] ) );
             return rest_ensure_response( array( 'success' => true ) );
         },
@@ -316,11 +316,11 @@ add_action( 'rest_api_init', function () {
     ) );
 
     // 404 Log — clear all.
-    register_rest_route( 'snel-seo/v1', '/404-log/all', array(
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/404-log/all', array(
         'methods'             => 'DELETE',
         'callback'            => function () {
             global $wpdb;
-            $table = $wpdb->prefix . 'snel_seo_404_log';
+            $table = SnelSeoConfig::table( SnelSeoConfig::$table_404_log );
             $wpdb->query( "TRUNCATE TABLE $table" );
             return rest_ensure_response( array( 'success' => true ) );
         },
