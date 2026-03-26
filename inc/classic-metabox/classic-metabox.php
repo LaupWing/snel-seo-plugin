@@ -9,35 +9,53 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Get fallback title for a language from product meta.
+ * Get fallback title for a language using dynamic config or post_title.
  */
 function snel_seo_classic_get_fallback_title( $post, $lang, $default_lang ) {
     if ( $lang === $default_lang ) {
         return $post->post_title;
     }
+    // Try per-language title meta key (e.g. _title_de).
     $translated = get_post_meta( $post->ID, '_title_' . $lang, true );
     return $translated ? $translated : $post->post_title;
 }
 
 /**
- * Get fallback description for a language from product meta.
- * Chain: short description → long description.
+ * Get fallback description for a language using dynamic config from Settings > Post Types.
+ * Falls back to excerpt if no config is set.
  */
 function snel_seo_classic_get_fallback_desc( $post_id, $lang, $default_lang ) {
-    // Try short description first.
-    $short = get_post_meta( $post_id, '_product_short_description', true );
-    if ( $short ) {
-        if ( is_array( $short ) && ! empty( $short[ $lang ] ) ) return $short[ $lang ];
-        if ( is_array( $short ) && ! empty( $short[ $default_lang ] ) ) return $short[ $default_lang ];
-        if ( is_string( $short ) && $short ) return $short;
-    }
+    $post_type  = get_post_type( $post_id );
+    $cpt_config = snel_seo_get_cpt_config( $post_type );
+    $fallbacks  = isset( $cpt_config['desc_fallback_keys'] ) ? $cpt_config['desc_fallback_keys'] : array();
 
-    // Try long description.
-    $desc = get_post_meta( $post_id, '_product_description', true );
-    if ( $desc ) {
-        if ( is_array( $desc ) && ! empty( $desc[ $lang ] ) ) return mb_substr( wp_strip_all_tags( $desc[ $lang ] ), 0, 155 );
-        if ( is_array( $desc ) && ! empty( $desc[ $default_lang ] ) ) return mb_substr( wp_strip_all_tags( $desc[ $default_lang ] ), 0, 155 );
-        if ( is_string( $desc ) && $desc ) return mb_substr( wp_strip_all_tags( $desc ), 0, 155 );
+    foreach ( $fallbacks as $field_key ) {
+        // Handle per-language pattern: '_something_{lang}'.
+        if ( strpos( $field_key, '_{lang}' ) !== false ) {
+            $key = str_replace( '_{lang}', '_' . $lang, $field_key );
+            $val = get_post_meta( $post_id, $key, true );
+            if ( $val && is_string( $val ) ) {
+                return mb_substr( wp_strip_all_tags( $val ), 0, 155 );
+            }
+            // Try default language.
+            $key_default = str_replace( '_{lang}', '_' . $default_lang, $field_key );
+            $val = get_post_meta( $post_id, $key_default, true );
+            if ( $val && is_string( $val ) ) {
+                return mb_substr( wp_strip_all_tags( $val ), 0, 155 );
+            }
+            continue;
+        }
+
+        // Multilingual array or plain string.
+        $val = get_post_meta( $post_id, $field_key, true );
+        if ( ! $val ) continue;
+
+        if ( is_array( $val ) ) {
+            if ( ! empty( $val[ $lang ] ) ) return mb_substr( wp_strip_all_tags( $val[ $lang ] ), 0, 155 );
+            if ( ! empty( $val[ $default_lang ] ) ) return mb_substr( wp_strip_all_tags( $val[ $default_lang ] ), 0, 155 );
+        } elseif ( is_string( $val ) && $val ) {
+            return mb_substr( wp_strip_all_tags( $val ), 0, 155 );
+        }
     }
 
     return '';

@@ -85,6 +85,77 @@ function snel_seo_get_vars() {
 }
 
 /**
+ * Resolve a meta field value for a post, handling multilingual arrays, per-lang keys, and plain strings.
+ *
+ * @param int    $post_id   The post ID.
+ * @param string $field_key The field key from the config (e.g. '_product_description' or '_title_{lang}').
+ * @return string Resolved text value for the current language, or empty string.
+ */
+function snel_seo_resolve_meta_field( $post_id, $field_key ) {
+    $lang    = snel_seo_get_current_lang();
+    $default = snel_seo_get_default_lang();
+
+    // Per-language field pattern: '_title_{lang}' → try '_title_nl', '_title_en', etc.
+    if ( strpos( $field_key, '_{lang}' ) !== false ) {
+        $key_for_lang    = str_replace( '_{lang}', '_' . $lang, $field_key );
+        $key_for_default = str_replace( '_{lang}', '_' . $default, $field_key );
+        $val = get_post_meta( $post_id, $key_for_lang, true );
+        if ( $val && is_string( $val ) ) {
+            return wp_strip_all_tags( $val );
+        }
+        $val = get_post_meta( $post_id, $key_for_default, true );
+        if ( $val && is_string( $val ) ) {
+            return wp_strip_all_tags( $val );
+        }
+        return '';
+    }
+
+    // Regular key — could be a multilingual array or plain string.
+    $val = get_post_meta( $post_id, $field_key, true );
+    if ( ! $val ) {
+        return '';
+    }
+
+    $text = '';
+    if ( is_array( $val ) ) {
+        $text = ! empty( $val[ $lang ] ) ? $val[ $lang ] : ( ! empty( $val[ $default ] ) ? $val[ $default ] : '' );
+    } elseif ( is_string( $val ) ) {
+        $decoded = json_decode( $val, true );
+        if ( is_array( $decoded ) ) {
+            $text = ! empty( $decoded[ $lang ] ) ? $decoded[ $lang ] : ( ! empty( $decoded[ $default ] ) ? $decoded[ $default ] : '' );
+        } else {
+            $text = $val;
+        }
+    }
+
+    return $text ? wp_strip_all_tags( $text ) : '';
+}
+
+/**
+ * Get the CPT settings config for a given post type.
+ */
+function snel_seo_get_cpt_config( $post_type ) {
+    $cpt_settings = get_option( 'snel_seo_post_type_settings', array() );
+    return isset( $cpt_settings[ $post_type ] ) ? $cpt_settings[ $post_type ] : array();
+}
+
+/**
+ * Get a multilingual template value from CPT config.
+ */
+function snel_seo_get_cpt_template( $config, $key ) {
+    if ( ! isset( $config[ $key ] ) ) {
+        return '';
+    }
+    $val = $config[ $key ];
+    if ( is_array( $val ) ) {
+        $lang    = snel_seo_get_current_lang();
+        $default = snel_seo_get_default_lang();
+        return ! empty( $val[ $lang ] ) ? $val[ $lang ] : ( ! empty( $val[ $default ] ) ? $val[ $default ] : '' );
+    }
+    return is_string( $val ) ? $val : '';
+}
+
+/**
  * Filter the document title.
  */
 add_filter( 'pre_get_document_title', function ( $title ) {
@@ -126,57 +197,58 @@ add_filter( 'pre_get_document_title', function ( $title ) {
         }
     }
 
+    // Custom post type template.
+    if ( is_singular() ) {
+        $post_type = get_post_type();
+        if ( $post_type && ! in_array( $post_type, array( 'post', 'page' ), true ) ) {
+            $cpt_config = snel_seo_get_cpt_config( $post_type );
+            $template   = snel_seo_get_cpt_template( $cpt_config, 'title_template' );
+            if ( $template ) {
+                $vars['title'] = get_the_title();
+                return snel_seo_resolve_template( $template, $vars );
+            }
+        }
+    }
+
     return $title;
 }, 15 );
 
 /**
  * Auto-generate a meta description for any singular post.
- * Fallback chain: custom SEO desc → excerpt → content → post meta text fields → title.
+ * Fallback chain: configured meta fields → excerpt → content → title + site name.
  */
 function snel_seo_auto_description( $post_id ) {
-    // 1. Excerpt.
+    $post_type = get_post_type( $post_id );
+
+    // 1. Configured fallback fields for this post type (from Settings > Post Types).
+    if ( $post_type ) {
+        $cpt_config    = snel_seo_get_cpt_config( $post_type );
+        $fallback_keys = isset( $cpt_config['desc_fallback_keys'] ) ? $cpt_config['desc_fallback_keys'] : array();
+
+        foreach ( $fallback_keys as $field_key ) {
+            $text = snel_seo_resolve_meta_field( $post_id, $field_key );
+            if ( $text ) {
+                $text = preg_replace( '/\s+/', ' ', trim( $text ) );
+                if ( strlen( $text ) > 10 ) {
+                    return mb_substr( $text, 0, 155 ) . '…';
+                }
+            }
+        }
+    }
+
+    // 2. Excerpt.
     $excerpt = get_the_excerpt( $post_id );
     if ( $excerpt && $excerpt !== __( 'No excerpt', 'default' ) ) {
         return wp_trim_words( wp_strip_all_tags( $excerpt ), 25, '…' );
     }
 
-    // 2. Post content.
+    // 3. Post content.
     $post = get_post( $post_id );
     if ( $post && ! empty( $post->post_content ) ) {
         $text = wp_strip_all_tags( strip_shortcodes( $post->post_content ) );
         $text = preg_replace( '/\s+/', ' ', trim( $text ) );
         if ( strlen( $text ) > 10 ) {
             return mb_substr( $text, 0, 155 ) . '…';
-        }
-    }
-
-    // 3. Common meta fields (multilingual arrays or plain strings).
-    $lang    = snel_seo_get_current_lang();
-    $default = snel_seo_get_default_lang();
-    $meta_keys = array( '_product_short_description', '_product_description', '_short_description', '_description' );
-
-    foreach ( $meta_keys as $key ) {
-        $val = get_post_meta( $post_id, $key, true );
-        if ( ! $val ) continue;
-
-        $text = '';
-        if ( is_array( $val ) ) {
-            $text = ! empty( $val[ $lang ] ) ? $val[ $lang ] : ( ! empty( $val[ $default ] ) ? $val[ $default ] : '' );
-        } elseif ( is_string( $val ) ) {
-            $decoded = json_decode( $val, true );
-            if ( is_array( $decoded ) ) {
-                $text = ! empty( $decoded[ $lang ] ) ? $decoded[ $lang ] : ( ! empty( $decoded[ $default ] ) ? $decoded[ $default ] : '' );
-            } else {
-                $text = $val;
-            }
-        }
-
-        if ( $text ) {
-            $text = wp_strip_all_tags( $text );
-            $text = preg_replace( '/\s+/', ' ', trim( $text ) );
-            if ( strlen( $text ) > 10 ) {
-                return mb_substr( $text, 0, 155 ) . '…';
-            }
         }
     }
 
@@ -242,6 +314,16 @@ add_action( 'wp_head', function () {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-post' );
         } elseif ( is_page() ) {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-page' );
+        } elseif ( is_singular() ) {
+            // Custom post type template.
+            $post_type = get_post_type();
+            if ( $post_type ) {
+                $cpt_config = snel_seo_get_cpt_config( $post_type );
+                $tpl        = snel_seo_get_cpt_template( $cpt_config, 'metadesc_template' );
+                if ( $tpl ) {
+                    $description = $tpl;
+                }
+            }
         } elseif ( is_tax() || is_category() || is_tag() ) {
             $term = get_queried_object();
             if ( $term && ! empty( $term->description ) ) {
@@ -335,19 +417,15 @@ add_action( 'wp_head', function () {
     // Product.
     if ( is_singular( 'product' ) ) {
         $post_id = get_queried_object_id();
-        $lang    = snel_seo_get_current_lang();
-        $default = snel_seo_get_default_lang();
         $name    = get_the_title( $post_id );
 
-        $desc_raw = get_post_meta( $post_id, '_product_short_description', true );
-        $desc     = '';
-        if ( $desc_raw ) {
-            $descs = is_array( $desc_raw ) ? $desc_raw : json_decode( $desc_raw, true );
-            if ( is_array( $descs ) ) {
-                $desc = ! empty( $descs[ $lang ] ) ? $descs[ $lang ] : ( ! empty( $descs[ $default ] ) ? $descs[ $default ] : '' );
-            } elseif ( is_string( $desc_raw ) ) {
-                $desc = $desc_raw;
-            }
+        // Use dynamic fallback to get description.
+        $cpt_config    = snel_seo_get_cpt_config( 'product' );
+        $fallback_keys = isset( $cpt_config['desc_fallback_keys'] ) ? $cpt_config['desc_fallback_keys'] : array( '_product_short_description' );
+        $desc = '';
+        foreach ( $fallback_keys as $field_key ) {
+            $desc = snel_seo_resolve_meta_field( $post_id, $field_key );
+            if ( $desc ) break;
         }
 
         $image     = get_the_post_thumbnail_url( $post_id, 'large' );
