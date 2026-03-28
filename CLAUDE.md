@@ -130,3 +130,28 @@ When pushing changes, **always bump the version** before committing. Version mus
 - `snel-seo.php` → `SNEL_SEO_VERSION` constant
 
 Ask the user whether the change warrants a **patch** (bug fix, small tweak), **minor** (new feature), or **major** (breaking change) bump, and recommend one. CI auto-creates a GitHub release when version changes on push to main.
+
+## Redirect Migration SOP
+
+**Critical lesson:** Never build the redirect mapping before the WordPress site is fully seeded. Target URLs must come from the actual WordPress database, not from guesses or scraper-generated slugs.
+
+### Correct order for site migrations:
+
+1. **Scrape old site** — collect all old URLs, product data, categories
+2. **Seed WordPress** — import everything (products, categories, pages, images)
+3. **Build redirect mapping** — query WordPress DB for real permalinks, match via article number / identifier, generate `snel-seo-import.json`
+4. **Import into Snel SEO** — use the JSON import (wildcards auto-detected from `*`)
+5. **Test with redirect tester** — drop the test JSON file, verify coverage
+6. **Cross-reference with Google Search Console** — ensure all URLs with impressions/clicks are covered
+
+### Redirect types:
+- **Products** (`/producten/show/{id}`) → exact match to `/product/{wp-slug}/` (query `_article_number` meta)
+- **Pagination** (`/Category/pagina/*`) → wildcard pattern to parent category
+- **Categories** → exact match to new flat category URL
+- **Deleted/missing content** → fallback to `/producten/`
+- **Image URLs** (`/uploads/...`) → ignore, Google drops these naturally
+
+### Matching:
+- All matching is **case-insensitive** (both exact and wildcard)
+- Wildcard patterns match any URL starting with the prefix before `*`
+- Exact matches are checked first, then patterns
