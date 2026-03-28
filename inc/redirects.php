@@ -88,19 +88,20 @@ add_action( 'template_redirect', function () {
     $request_path = '/' . trim( wp_parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
     if ( empty( $request_path ) || $request_path === '/' ) return;
 
-    // 1. Try exact match first.
+    // 1. Try exact match first (case-insensitive).
     $row = $wpdb->get_row( $wpdb->prepare(
-        "SELECT id, target_url, type FROM $table WHERE source_url = %s AND is_pattern = 0 LIMIT 1",
+        "SELECT id, target_url, type FROM $table WHERE LOWER(source_url) = LOWER(%s) AND is_pattern = 0 LIMIT 1",
         $request_path
     ) );
 
-    // 2. If no exact match, try pattern (wildcard) redirects.
+    // 2. If no exact match, try pattern (wildcard) redirects (case-insensitive).
     if ( ! $row ) {
         $patterns = $wpdb->get_results( "SELECT id, source_url, target_url, type FROM $table WHERE is_pattern = 1" );
+        $request_lower = strtolower( $request_path );
         foreach ( $patterns as $pattern ) {
             // source_url stored without trailing *, e.g. "/Antieke-meubels/pagina"
-            $prefix = rtrim( $pattern->source_url, '/*' );
-            if ( strpos( $request_path, $prefix . '/' ) === 0 || $request_path === $prefix ) {
+            $prefix = strtolower( rtrim( $pattern->source_url, '/*' ) );
+            if ( strpos( $request_lower, $prefix . '/' ) === 0 || $request_lower === $prefix ) {
                 $row = $pattern;
                 break;
             }
@@ -318,31 +319,33 @@ add_action( 'rest_api_init', function () {
             $exact    = $wpdb->get_results( "SELECT source_url, target_url, type FROM $table WHERE is_pattern = 0", ARRAY_A );
             $patterns = $wpdb->get_results( "SELECT source_url, target_url, type FROM $table WHERE is_pattern = 1", ARRAY_A );
 
+            // Build case-insensitive exact lookup.
             $exact_map = array();
             foreach ( $exact as $r ) {
-                $exact_map[ $r['source_url'] ] = $r;
+                $exact_map[ strtolower( $r['source_url'] ) ] = $r;
             }
 
             $results = array();
             foreach ( $urls as $raw_url ) {
                 $path = '/' . trim( wp_parse_url( sanitize_text_field( $raw_url ), PHP_URL_PATH ) ?: $raw_url, '/' );
+                $path_lower = strtolower( $path );
 
-                // Check exact match.
-                if ( isset( $exact_map[ $path ] ) ) {
+                // Check exact match (case-insensitive).
+                if ( isset( $exact_map[ $path_lower ] ) ) {
                     $results[] = array(
                         'url'    => $path,
                         'status' => 'ok',
-                        'target' => $exact_map[ $path ]['target_url'],
-                        'type'   => (int) $exact_map[ $path ]['type'],
+                        'target' => $exact_map[ $path_lower ]['target_url'],
+                        'type'   => (int) $exact_map[ $path_lower ]['type'],
                     );
                     continue;
                 }
 
-                // Check pattern match.
+                // Check pattern match (case-insensitive).
                 $matched = false;
                 foreach ( $patterns as $p ) {
-                    $prefix = rtrim( $p['source_url'], '/*' );
-                    if ( strpos( $path, $prefix . '/' ) === 0 || $path === $prefix ) {
+                    $prefix = strtolower( rtrim( $p['source_url'], '/*' ) );
+                    if ( strpos( $path_lower, $prefix . '/' ) === 0 || $path_lower === $prefix ) {
                         $results[] = array(
                             'url'     => $path,
                             'status'  => 'ok',
