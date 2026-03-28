@@ -20,6 +20,7 @@ function snel_seo_create_redirects_table() {
         source_url varchar(500) NOT NULL,
         target_url varchar(500) NOT NULL,
         type smallint(3) NOT NULL DEFAULT 301,
+        is_pattern tinyint(1) NOT NULL DEFAULT 0,
         hits bigint(20) unsigned NOT NULL DEFAULT 0,
         created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -30,12 +31,17 @@ function snel_seo_create_redirects_table() {
     dbDelta( $sql );
 }
 
-// Create table on admin init if it doesn't exist.
+// Create table on admin init if it doesn't exist, and add is_pattern column if missing.
 add_action( 'admin_init', function () {
     global $wpdb;
     $table = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
     if ( $wpdb->get_var( "SHOW TABLES LIKE '$table'" ) !== $table ) {
         snel_seo_create_redirects_table();
+    } else {
+        $col = $wpdb->get_results( "SHOW COLUMNS FROM $table LIKE 'is_pattern'" );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE $table ADD COLUMN is_pattern tinyint(1) NOT NULL DEFAULT 0 AFTER type" );
+        }
     }
 } );
 
@@ -82,10 +88,24 @@ add_action( 'template_redirect', function () {
     $request_path = '/' . trim( wp_parse_url( $_SERVER['REQUEST_URI'], PHP_URL_PATH ), '/' );
     if ( empty( $request_path ) || $request_path === '/' ) return;
 
+    // 1. Try exact match first.
     $row = $wpdb->get_row( $wpdb->prepare(
-        "SELECT id, target_url, type FROM $table WHERE source_url = %s LIMIT 1",
+        "SELECT id, target_url, type FROM $table WHERE source_url = %s AND is_pattern = 0 LIMIT 1",
         $request_path
     ) );
+
+    // 2. If no exact match, try pattern (wildcard) redirects.
+    if ( ! $row ) {
+        $patterns = $wpdb->get_results( "SELECT id, source_url, target_url, type FROM $table WHERE is_pattern = 1" );
+        foreach ( $patterns as $pattern ) {
+            // source_url stored without trailing *, e.g. "/Antieke-meubels/pagina"
+            $prefix = rtrim( $pattern->source_url, '/*' );
+            if ( strpos( $request_path, $prefix . '/' ) === 0 || $request_path === $prefix ) {
+                $row = $pattern;
+                break;
+            }
+        }
+    }
 
     if ( $row ) {
         $wpdb->query( $wpdb->prepare( "UPDATE $table SET hits = hits + 1 WHERE id = %d", $row->id ) );
@@ -147,9 +167,10 @@ add_action( 'rest_api_init', function () {
                 $table  = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
                 $params = $request->get_json_params();
 
-                $source = isset( $params['source_url'] ) ? sanitize_text_field( $params['source_url'] ) : '';
-                $target = isset( $params['target_url'] ) ? sanitize_text_field( $params['target_url'] ) : '';
-                $type   = isset( $params['type'] ) ? (int) $params['type'] : 301;
+                $source     = isset( $params['source_url'] ) ? sanitize_text_field( $params['source_url'] ) : '';
+                $target     = isset( $params['target_url'] ) ? sanitize_text_field( $params['target_url'] ) : '';
+                $type       = isset( $params['type'] ) ? (int) $params['type'] : 301;
+                $is_pattern = ! empty( $params['is_pattern'] ) ? 1 : 0;
 
                 if ( empty( $source ) || empty( $target ) ) {
                     return new WP_Error( 'missing_fields', 'Source and target URLs are required.', array( 'status' => 400 ) );
@@ -162,6 +183,7 @@ add_action( 'rest_api_init', function () {
                     'source_url' => $source,
                     'target_url' => $target,
                     'type'       => in_array( $type, array( 301, 302 ), true ) ? $type : 301,
+                    'is_pattern' => $is_pattern,
                 ) );
 
                 return rest_ensure_response( array( 'id' => $wpdb->insert_id, 'success' => true ) );
@@ -191,6 +213,9 @@ add_action( 'rest_api_init', function () {
                 if ( isset( $params['type'] ) ) {
                     $type = (int) $params['type'];
                     $update['type'] = in_array( $type, array( 301, 302 ), true ) ? $type : 301;
+                }
+                if ( isset( $params['is_pattern'] ) ) {
+                    $update['is_pattern'] = ! empty( $params['is_pattern'] ) ? 1 : 0;
                 }
 
                 if ( ! empty( $update ) ) {
@@ -241,6 +266,9 @@ add_action( 'rest_api_init', function () {
                     continue;
                 }
 
+                $is_pattern = substr( $old, -1 ) === '*' ? 1 : 0;
+                $old        = rtrim( $old, '*' );
+
                 $source = '/' . trim( wp_parse_url( $old, PHP_URL_PATH ) ?: $old, '/' );
                 $target = '/' . trim( wp_parse_url( $new, PHP_URL_PATH ) ?: $new, '/' );
 
@@ -257,6 +285,7 @@ add_action( 'rest_api_init', function () {
                     'source_url' => $source,
                     'target_url' => $target,
                     'type'       => 301,
+                    'is_pattern' => $is_pattern,
                 ) );
                 $imported++;
             }

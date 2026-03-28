@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Modal, SelectControl } from '@wordpress/components';
-import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink } from 'lucide-react';
+import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk } from 'lucide-react';
 import Tabs from '../components/Tabs';
 
 const TABS = [
@@ -230,6 +230,7 @@ export default function Redirects() {
     const [ redirectType, setRedirectType ] = useState( '301' );
     const [ saving, setSaving ] = useState( false );
     const [ editingId, setEditingId ] = useState( null );
+    const [ isPattern, setIsPattern ] = useState( false );
 
     const fetchRedirects = async () => {
         try {
@@ -248,17 +249,18 @@ export default function Redirects() {
         if ( ! sourceUrl || ! targetUrl ) return;
         setSaving( true );
         try {
+            const payload = { source_url: sourceUrl, target_url: targetUrl, type: parseInt( redirectType ), is_pattern: isPattern };
             if ( editingId ) {
                 await fetch( `${ window.snelSeo.restUrl }/redirects/${ editingId }`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
-                    body: JSON.stringify( { source_url: sourceUrl, target_url: targetUrl, type: parseInt( redirectType ) } ),
+                    body: JSON.stringify( payload ),
                 } );
             } else {
                 await fetch( `${ window.snelSeo.restUrl }/redirects`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
-                    body: JSON.stringify( { source_url: sourceUrl, target_url: targetUrl, type: parseInt( redirectType ) } ),
+                    body: JSON.stringify( payload ),
                 } );
             }
             setShowModal( false );
@@ -266,6 +268,7 @@ export default function Redirects() {
             setSourceUrl( '' );
             setTargetUrl( '' );
             setRedirectType( '301' );
+            setIsPattern( false );
             await fetchRedirects();
         } catch ( e ) { /* ignore */ }
         setSaving( false );
@@ -276,6 +279,7 @@ export default function Redirects() {
         setSourceUrl( r.source_url );
         setTargetUrl( r.target_url );
         setRedirectType( String( r.type ) );
+        setIsPattern( !! parseInt( r.is_pattern ) );
         setShowModal( true );
     };
 
@@ -284,6 +288,7 @@ export default function Redirects() {
         setSourceUrl( prefillSource || '' );
         setTargetUrl( '' );
         setRedirectType( '301' );
+        setIsPattern( false );
         setShowModal( true );
         setActiveTab( 'redirects' );
     };
@@ -468,6 +473,12 @@ export default function Redirects() {
                                         <tr key={ r.id } className="border-b border-gray-100 hover:bg-gray-50">
                                             <td className="px-4 py-3 font-mono text-xs text-gray-700 break-all">
                                                 { r.source_url }
+                                                { !! parseInt( r.is_pattern ) && (
+                                                    <span className="ml-2 inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">
+                                                        <Asterisk size={ 10 } />
+                                                        pattern
+                                                    </span>
+                                                ) }
                                             </td>
                                             <td className="text-center">
                                                 <ArrowRight size={ 14 } className="text-gray-300" />
@@ -555,10 +566,20 @@ export default function Redirects() {
                                 type="text"
                                 value={ sourceUrl }
                                 onChange={ ( e ) => setSourceUrl( e.target.value ) }
-                                placeholder="/old-page-slug"
+                                placeholder={ isPattern ? '/category/pagina/*' : '/old-page-slug' }
                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
                         </div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={ isPattern }
+                                onChange={ ( e ) => setIsPattern( e.target.checked ) }
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{ __( 'Wildcard pattern', 'snel-seo' ) }</span>
+                            <span className="text-xs text-gray-400">{ __( 'matches all URLs starting with this path', 'snel-seo' ) }</span>
+                        </label>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 { __( 'Target URL (new destination)', 'snel-seo' ) }
