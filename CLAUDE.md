@@ -121,3 +121,12 @@ When no custom SEO description is set for a post:
 - Never hardcode post type names or meta keys — use the dynamic config from `snel_seo_post_type_settings`.
 - The option name `wpseo_titles` is legacy (from Yoast compatibility) — do not rename it.
 - AI features use OpenAI via the Snelstack plugin's API key (`snelstack_get_openai_key()`).
+
+## Versioning
+
+When pushing changes, **always bump the version** before committing. Version must be updated in all three places:
+- `package.json` → `"version"`
+- `snel-seo.php` → `Version:` header comment
+- `snel-seo.php` → `SNEL_SEO_VERSION` constant
+
+Ask the user whether the change warrants a **patch** (bug fix, small tweak), **minor** (new feature), or **major** (breaking change) bump, and recommend one. CI auto-creates a GitHub release when version changes on push to main.
