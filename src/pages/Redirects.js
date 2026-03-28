@@ -393,6 +393,48 @@ export default function Redirects() {
         setTestProgress( { done: total, total } );
     };
 
+    const [ dragOver, setDragOver ] = useState( false );
+
+    const parseTestFile = async ( file ) => {
+        const text = await file.text();
+        try {
+            const data = JSON.parse( text );
+            // Support different JSON formats: array of strings, array of objects with url/old_url/source_url
+            let urls = [];
+            if ( Array.isArray( data ) ) {
+                urls = data.map( ( item ) => {
+                    if ( typeof item === 'string' ) return item;
+                    return item.url || item.old_url || item.source_url || item.Top_pages || item.Page || '';
+                } ).filter( Boolean );
+            }
+            return urls;
+        } catch {
+            // Not JSON — treat as plain text, one URL per line
+            return text.trim().split( '\n' ).map( ( u ) => u.trim() ).filter( Boolean );
+        }
+    };
+
+    const handleTestFileDrop = async ( e ) => {
+        e.preventDefault();
+        setDragOver( false );
+        const file = e.dataTransfer?.files?.[ 0 ];
+        if ( ! file ) return;
+        const urls = await parseTestFile( file );
+        if ( urls.length ) {
+            setTestInput( urls.join( '\n' ) );
+        }
+    };
+
+    const handleTestFileInput = async ( e ) => {
+        const file = e.target.files?.[ 0 ];
+        if ( ! file ) return;
+        const urls = await parseTestFile( file );
+        if ( urls.length ) {
+            setTestInput( urls.join( '\n' ) );
+        }
+        e.target.value = '';
+    };
+
     const openTestModal = () => {
         setShowTestModal( true );
         setTestInput( '' );
@@ -707,19 +749,38 @@ export default function Redirects() {
                         { testResults.length === 0 && ! testRunning && (
                             <>
                                 <p className="text-sm text-gray-500">
-                                    { __( 'Paste URLs (one per line) to check if they have matching redirects.', 'snel-seo' ) }
+                                    { __( 'Paste URLs, type them, or drop a JSON file to test.', 'snel-seo' ) }
                                 </p>
-                                <textarea
-                                    value={ testInput }
-                                    onChange={ ( e ) => setTestInput( e.target.value ) }
-                                    placeholder={ '/old-page-1\n/old-page-2\nhttp://antiquewarehouse.nl/producten/show/123' }
-                                    rows={ 10 }
-                                    className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 focus:shadow-[0_0_0_1px_#a855f7] resize-y"
-                                />
+                                <div
+                                    className={ `relative rounded-lg transition-colors ${ dragOver ? 'ring-2 ring-purple-400 bg-purple-50' : '' }` }
+                                    onDragOver={ ( e ) => { e.preventDefault(); setDragOver( true ); } }
+                                    onDragLeave={ () => setDragOver( false ) }
+                                    onDrop={ handleTestFileDrop }
+                                >
+                                    { dragOver && (
+                                        <div className="absolute inset-0 flex items-center justify-center bg-purple-50/90 rounded-lg z-10 pointer-events-none">
+                                            <span className="text-sm font-medium text-purple-600">{ __( 'Drop JSON file here', 'snel-seo' ) }</span>
+                                        </div>
+                                    ) }
+                                    <textarea
+                                        value={ testInput }
+                                        onChange={ ( e ) => setTestInput( e.target.value ) }
+                                        placeholder={ '/old-page-1\n/old-page-2\nhttp://antiquewarehouse.nl/producten/show/123\n\nOr drag & drop a JSON file here...' }
+                                        rows={ 10 }
+                                        className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 focus:shadow-[0_0_0_1px_#a855f7] resize-y"
+                                    />
+                                </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-400">
-                                        { testInput.trim() ? `${ testInput.trim().split( '\n' ).filter( Boolean ).length } URLs` : '' }
-                                    </span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xs text-gray-400">
+                                            { testInput.trim() ? `${ testInput.trim().split( '\n' ).filter( Boolean ).length } URLs` : '' }
+                                        </span>
+                                        <label className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 cursor-pointer transition-colors">
+                                            <Upload size={ 12 } />
+                                            { __( 'Load JSON file', 'snel-seo' ) }
+                                            <input type="file" accept=".json,.txt,.csv" onChange={ handleTestFileInput } className="hidden" />
+                                        </label>
+                                    </div>
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={ () => {
