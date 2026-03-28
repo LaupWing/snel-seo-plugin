@@ -100,12 +100,13 @@ class SnelSeoConfig {
     );
 
     // ── Sitemap Defaults ─────────────────────────────────────────────
+    // CPT include toggles are added dynamically in snel_seo_sitemap_settings().
+    // Note: CPT include toggles are added dynamically in snel_seo_sitemap_settings().
     public static $sitemap_defaults = array(
-        'enabled'          => false,
-        'include_pages'    => true,
-        'include_posts'    => true,
-        'include_products' => true,
-        'excluded_ids'     => array(),
+        'enabled'       => false,
+        'include_pages' => true,
+        'include_posts' => true,
+        'excluded_ids'  => array(),
     );
 
     // ── Helpers ──────────────────────────────────────────────────────

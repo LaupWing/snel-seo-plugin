@@ -23,7 +23,7 @@ Each page is a self-contained component that manages its own state and API calls
 | `Settings.js` | `settings` | General settings, title/meta templates (multilingual), Post Types tab |
 | `Redirects.js` | `redirects` | Redirect CRUD + 404 log tab |
 | `Sitemap.js` | `sitemap` | Sitemap settings, preview, exclusion list |
-| `Tools.js` | `tools` | robots.txt editor |
+| `Tools.js` | `tools` | robots.txt editor, Export All URLs |
 
 ## Shared Components (`src/components/`)
 
@@ -54,7 +54,7 @@ window.snelSeo = {
     siteUrl:      'https://site.com',
     siteName:     'Site Name',
     siteDesc:     'Site tagline',
-    postTypes:    [{ name: 'product', label: 'Products', fields: [...] }],
+    postTypes:    [{ name: 'product', label: 'Products', fields: [...], taxonomies: [...] }],
 };
 ```
 
@@ -71,3 +71,18 @@ window.snelSeo = {
 - Multilingual inputs: settings state stores objects `{ nl: '...', en: '...' }`, the `activeLang` state controls which language is shown
 - All text uses `__()` from `@wordpress/i18n` for translation readiness
 - No Redux or external state management — each page manages its own `useState`
+
+## Schema Types (`src/schema-types/`)
+
+Each file defines a schema type with its field mappings for the Post Types settings UI:
+
+| File | Schema.org type | Key fields |
+|------|----------------|------------|
+| `product.js` | Product | price, currency, availability, brand, sku, taxonomy |
+| `article.js` | Article | author, publisher, taxonomy |
+| `local-business.js` | LocalBusiness | address, phone, hours, price range |
+| `event.js` | Event | dates, venue, ticket price, taxonomy |
+| `faq.js` | FAQPage | (no fields — uses content) |
+| `index.js` | — | Exports all types as `SCHEMA_TYPES` array |
+
+Adding a new schema type: create a new file, export `{ type, label, description, fields }`, import in `index.js`.

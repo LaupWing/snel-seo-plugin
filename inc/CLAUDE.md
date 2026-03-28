@@ -5,7 +5,7 @@
 | File | What it does |
 |------|-------------|
 | `admin.php` | Admin menu registration, React app enqueue, settings save/load REST endpoints, `snel_seo_get_custom_post_types_with_meta()` for field detection |
-| `head-output.php` | All frontend `<head>` output: title filter, meta description, OG tags, canonical URL, JSON-LD (Organization, BreadcrumbList, Product) |
+| `head-output.php` | All frontend `<head>` output: title filter, meta description, OG tags, canonical URL, JSON-LD (Organization, BreadcrumbList, dynamic per-CPT schema) |
 | `meta-box.php` | Registers SEO metabox on all public post types. Auto-detects Gutenberg vs classic editor per post. |
 | `classic-metabox/` | PHP-rendered metabox for non-Gutenberg post types. Has its own fallback title/description pre-fill logic. |
 | `rest-api.php` | AI-powered endpoints: analyze keyphrase, suggest keyphrases, generate title/desc/keyphrase, render post content |
@@ -41,7 +41,10 @@ All under namespace `snel-seo/v1`. Require `manage_options` for admin endpoints,
 | `/suggest-keyphrases/{id}` | POST | AI keyphrase suggestions |
 | `/generate/{id}` | POST | AI generate title/desc/keyphrase |
 | `/render/{id}` | GET | Server-side content extraction for AI analysis |
+| `/redirects/test` | POST | Bulk test URLs against redirect table |
+| `/export-urls` | GET | Export all site URLs (pages, posts, CPTs, taxonomies) |
 | `/sitemap/settings` | GET/POST | Sitemap config |
+| `/sitemap/preview` | GET | Preview sitemap URLs |
 | `/robots` | GET/POST | robots.txt content |
 
 ## Title Resolution Order (head-output.php)

@@ -11,13 +11,20 @@ defined( 'ABSPATH' ) || exit;
  * Get sitemap settings.
  */
 function snel_seo_sitemap_settings() {
-    return wp_parse_args( get_option( SnelSeoConfig::$option_sitemap, array() ), array(
-        'enabled'          => false,   // false = use WP default, true = use custom
-        'include_pages'    => true,
-        'include_posts'    => true,
-        'include_products' => true,
-        'excluded_ids'     => array(),
-    ) );
+    $defaults = array(
+        'enabled'       => false,   // false = use WP default, true = use custom
+        'include_pages' => true,
+        'include_posts' => true,
+        'excluded_ids'  => array(),
+    );
+
+    // Dynamically add include toggles for all public custom post types.
+    $cpts = get_post_types( array( 'public' => true, '_builtin' => false ), 'names' );
+    foreach ( $cpts as $cpt ) {
+        $defaults[ 'include_' . $cpt ] = true;
+    }
+
+    return wp_parse_args( get_option( SnelSeoConfig::$option_sitemap, array() ), $defaults );
 }
 
 /**
@@ -75,10 +82,15 @@ function snel_seo_render_sitemap_index( $settings ) {
             $sitemaps[] = home_url( '/sitemap-posts.xml' );
         }
     }
-    if ( $settings['include_products'] && post_type_exists( 'product' ) ) {
-        $count = wp_count_posts( 'product' );
-        if ( $count->publish > 0 ) {
-            $sitemaps[] = home_url( '/sitemap-products.xml' );
+
+    // Dynamically add all public CPTs that are enabled.
+    $cpts = get_post_types( array( 'public' => true, '_builtin' => false ), 'names' );
+    foreach ( $cpts as $cpt ) {
+        if ( ! empty( $settings[ 'include_' . $cpt ] ) ) {
+            $count = wp_count_posts( $cpt );
+            if ( $count->publish > 0 ) {
+                $sitemaps[] = home_url( '/sitemap-' . $cpt . '.xml' );
+            }
         }
     }
 
@@ -99,16 +111,15 @@ function snel_seo_render_sitemap_index( $settings ) {
  * Render a sub-sitemap for a given type.
  */
 function snel_seo_render_sitemap( $type, $settings ) {
+    // Map sitemap URL slug to post type.
     $post_type = 'pages' === $type ? 'page' : ( 'posts' === $type ? 'post' : $type );
 
     // Validate type is enabled.
     if ( 'page' === $post_type && ! $settings['include_pages'] ) return '';
     if ( 'post' === $post_type && ! $settings['include_posts'] ) return '';
-    if ( 'products' === $type && ! $settings['include_products'] ) {
-        return '';
-    }
-    if ( 'products' === $type ) {
-        $post_type = 'product';
+    // For CPTs, check the dynamic include setting.
+    if ( ! in_array( $post_type, array( 'page', 'post' ), true ) ) {
+        if ( empty( $settings[ 'include_' . $post_type ] ) ) return '';
     }
 
     $excluded = array_map( 'intval', $settings['excluded_ids'] );
@@ -175,8 +186,13 @@ add_action( 'rest_api_init', function () {
                 if ( isset( $params['include_posts'] ) ) {
                     $settings['include_posts'] = (bool) $params['include_posts'];
                 }
-                if ( isset( $params['include_products'] ) ) {
-                    $settings['include_products'] = (bool) $params['include_products'];
+                // Handle all CPT include toggles dynamically.
+                $cpts = get_post_types( array( 'public' => true, '_builtin' => false ), 'names' );
+                foreach ( $cpts as $cpt ) {
+                    $key = 'include_' . $cpt;
+                    if ( isset( $params[ $key ] ) ) {
+                        $settings[ $key ] = (bool) $params[ $key ];
+                    }
                 }
                 if ( isset( $params['excluded_ids'] ) && is_array( $params['excluded_ids'] ) ) {
                     $settings['excluded_ids'] = array_map( 'intval', $params['excluded_ids'] );
@@ -206,7 +222,10 @@ add_action( 'rest_api_init', function () {
             $types = array();
             if ( $settings['include_pages'] ) $types[] = 'page';
             if ( $settings['include_posts'] ) $types[] = 'post';
-            if ( $settings['include_products'] && post_type_exists( 'product' ) ) $types[] = 'product';
+            $cpts = get_post_types( array( 'public' => true, '_builtin' => false ), 'names' );
+            foreach ( $cpts as $cpt ) {
+                if ( ! empty( $settings[ 'include_' . $cpt ] ) ) $types[] = $cpt;
+            }
 
             foreach ( $types as $post_type ) {
                 $args = array(
@@ -237,8 +256,9 @@ add_action( 'rest_api_init', function () {
 
             // Also return excluded posts separately so they show in the UI.
             if ( ! empty( $excluded ) ) {
+                $all_types = array_merge( array( 'page', 'post' ), array_values( $cpts ) );
                 $excluded_posts = get_posts( array(
-                    'post_type'      => array( 'page', 'post', 'product' ),
+                    'post_type'      => $all_types,
                     'post__in'       => $excluded,
                     'post_status'    => 'publish',
                     'posts_per_page' => 100,

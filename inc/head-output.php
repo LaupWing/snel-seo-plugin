@@ -383,14 +383,20 @@ add_action( 'wp_head', function () {
 
     // BreadcrumbList.
     if ( is_singular() ) {
-        $post_id = get_queried_object_id();
-        $items   = array();
-        $pos     = 1;
+        $post_id   = get_queried_object_id();
+        $post_type = get_post_type( $post_id );
+        $items     = array();
+        $pos       = 1;
 
         $items[] = array( '@type' => 'ListItem', 'position' => $pos++, 'name' => $site_name, 'item' => $site_url );
 
-        if ( is_singular( 'product' ) ) {
-            $terms = get_the_terms( $post_id, 'product_category' );
+        // Add taxonomy breadcrumb if the CPT has a schema config with a taxonomy field.
+        $cpt_config   = snel_seo_get_cpt_config( $post_type );
+        $schema_type  = isset( $cpt_config['schema_type'] ) ? $cpt_config['schema_type'] : '';
+        $schema_fields = isset( $cpt_config['schema_fields'] ) ? $cpt_config['schema_fields'] : array();
+
+        if ( $schema_type && ! empty( $schema_fields['taxonomy'] ) ) {
+            $terms = get_the_terms( $post_id, $schema_fields['taxonomy'] );
             if ( $terms && ! is_wp_error( $terms ) ) {
                 $term    = $terms[0];
                 $items[] = array( '@type' => 'ListItem', 'position' => $pos++, 'name' => $term->name, 'item' => get_term_link( $term ) );
@@ -403,31 +409,108 @@ add_action( 'wp_head', function () {
         printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
     }
 
-    // Product.
-    if ( is_singular( 'product' ) ) {
-        $post_id = get_queried_object_id();
-        $name    = get_the_title( $post_id );
+    // Dynamic schema output — reads schema_type + schema_fields from per-CPT settings.
+    if ( is_singular() ) {
+        $post_id       = get_queried_object_id();
+        $post_type     = get_post_type( $post_id );
+        $cpt_config    = snel_seo_get_cpt_config( $post_type );
+        $schema_type   = isset( $cpt_config['schema_type'] ) ? $cpt_config['schema_type'] : '';
+        $sf            = isset( $cpt_config['schema_fields'] ) ? $cpt_config['schema_fields'] : array();
 
-        // Use dynamic fallback to get description.
-        $cpt_config    = snel_seo_get_cpt_config( 'product' );
-        $fallback_keys = isset( $cpt_config['desc_fallback_keys'] ) ? $cpt_config['desc_fallback_keys'] : array( '_product_short_description' );
-        $desc = '';
-        foreach ( $fallback_keys as $field_key ) {
-            $desc = snel_seo_resolve_meta_field( $post_id, $field_key );
-            if ( $desc ) break;
+        if ( $schema_type ) {
+            $name  = get_the_title( $post_id );
+            $url   = get_permalink( $post_id );
+            $image = get_the_post_thumbnail_url( $post_id, 'large' );
+
+            // Description from fallback chain.
+            $fallback_keys = isset( $cpt_config['desc_fallback_keys'] ) ? $cpt_config['desc_fallback_keys'] : array();
+            $desc = '';
+            foreach ( $fallback_keys as $field_key ) {
+                $desc = snel_seo_resolve_meta_field( $post_id, $field_key );
+                if ( $desc ) break;
+            }
+
+            $schema = array( '@context' => 'https://schema.org', '@type' => $schema_type, 'name' => $name, 'url' => $url );
+            if ( $desc )  $schema['description'] = wp_strip_all_tags( $desc );
+            if ( $image ) $schema['image'] = $image;
+
+            // Product-specific fields.
+            if ( $schema_type === 'Product' ) {
+                $price_key = ! empty( $sf['price'] ) ? $sf['price'] : '';
+                $price_raw = $price_key ? get_post_meta( $post_id, $price_key, true ) : '';
+                $price     = $price_raw ? preg_replace( '/[^0-9.,]/', '', $price_raw ) : '';
+                $currency  = ! empty( $sf['priceCurrency'] ) ? $sf['priceCurrency'] : 'EUR';
+
+                if ( $price ) {
+                    $offer = array( '@type' => 'Offer', 'price' => str_replace( ',', '.', $price ), 'priceCurrency' => $currency );
+                    if ( ! empty( $sf['availability'] ) ) {
+                        $sold = get_post_meta( $post_id, $sf['availability'], true );
+                        $offer['availability'] = $sold ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock';
+                    }
+                    $schema['offers'] = $offer;
+                }
+                if ( ! empty( $sf['brand'] ) )  $schema['brand'] = array( '@type' => 'Brand', 'name' => $sf['brand'] );
+                if ( ! empty( $sf['sku'] ) ) {
+                    $sku_val = get_post_meta( $post_id, $sf['sku'], true );
+                    if ( $sku_val ) $schema['sku'] = $sku_val;
+                }
+            }
+
+            // Article-specific fields.
+            if ( $schema_type === 'Article' ) {
+                $schema['headline']      = $name;
+                $schema['datePublished']  = get_the_date( 'c', $post_id );
+                $schema['dateModified']   = get_the_modified_date( 'c', $post_id );
+
+                $author_name = ! empty( $sf['authorName'] ) ? $sf['authorName'] : get_the_author_meta( 'display_name', get_post_field( 'post_author', $post_id ) );
+                if ( $author_name ) $schema['author'] = array( '@type' => 'Person', 'name' => $author_name );
+
+                $publisher_name = ! empty( $sf['publisherName'] ) ? $sf['publisherName'] : $site_name;
+                $schema['publisher'] = array( '@type' => 'Organization', 'name' => $publisher_name );
+                if ( $og_image ) $schema['publisher']['logo'] = array( '@type' => 'ImageObject', 'url' => $og_image );
+            }
+
+            // LocalBusiness-specific fields.
+            if ( $schema_type === 'LocalBusiness' ) {
+                unset( $schema['name'] );
+                $schema['name'] = $site_name;
+                $address = array( '@type' => 'PostalAddress' );
+                if ( ! empty( $sf['streetAddress'] ) )   $address['streetAddress']   = $sf['streetAddress'];
+                if ( ! empty( $sf['addressLocality'] ) ) $address['addressLocality'] = $sf['addressLocality'];
+                if ( ! empty( $sf['postalCode'] ) )      $address['postalCode']      = $sf['postalCode'];
+                if ( ! empty( $sf['addressCountry'] ) )  $address['addressCountry']  = $sf['addressCountry'];
+                if ( count( $address ) > 1 ) $schema['address'] = $address;
+                if ( ! empty( $sf['telephone'] ) )    $schema['telephone']    = $sf['telephone'];
+                if ( ! empty( $sf['openingHours'] ) ) $schema['openingHours'] = $sf['openingHours'];
+                if ( ! empty( $sf['priceRange'] ) )   $schema['priceRange']   = $sf['priceRange'];
+            }
+
+            // Event-specific fields.
+            if ( $schema_type === 'Event' ) {
+                if ( ! empty( $sf['startDate'] ) ) {
+                    $start = get_post_meta( $post_id, $sf['startDate'], true );
+                    if ( $start ) $schema['startDate'] = $start;
+                }
+                if ( ! empty( $sf['endDate'] ) ) {
+                    $end = get_post_meta( $post_id, $sf['endDate'], true );
+                    if ( $end ) $schema['endDate'] = $end;
+                }
+                if ( ! empty( $sf['locationName'] ) || ! empty( $sf['locationAddress'] ) ) {
+                    $location = array( '@type' => 'Place' );
+                    if ( ! empty( $sf['locationName'] ) )    $location['name']    = $sf['locationName'];
+                    if ( ! empty( $sf['locationAddress'] ) ) $location['address'] = $sf['locationAddress'];
+                    $schema['location'] = $location;
+                }
+                if ( ! empty( $sf['price'] ) ) {
+                    $ticket_price = get_post_meta( $post_id, $sf['price'], true );
+                    if ( $ticket_price ) {
+                        $currency = ! empty( $sf['priceCurrency'] ) ? $sf['priceCurrency'] : 'EUR';
+                        $schema['offers'] = array( '@type' => 'Offer', 'price' => preg_replace( '/[^0-9.,]/', '', $ticket_price ), 'priceCurrency' => $currency );
+                    }
+                }
+            }
+
+            printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
         }
-
-        $image     = get_the_post_thumbnail_url( $post_id, 'large' );
-        $price_raw = get_post_meta( $post_id, '_price', true );
-        $price     = $price_raw ? preg_replace( '/[^0-9.,]/', '', $price_raw ) : '';
-
-        $product = array( '@context' => 'https://schema.org', '@type' => 'Product', 'name' => $name, 'url' => get_permalink( $post_id ) );
-        if ( $desc ) $product['description'] = wp_strip_all_tags( $desc );
-        if ( $image ) $product['image'] = $image;
-        if ( $price ) {
-            $product['offers'] = array( '@type' => 'Offer', 'price' => str_replace( ',', '.', $price ), 'priceCurrency' => 'EUR', 'availability' => 'https://schema.org/InStock' );
-        }
-
-        printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $product, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
     }
 }, 2 );

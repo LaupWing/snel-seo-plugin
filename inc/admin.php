@@ -222,6 +222,18 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
                 $cpt_settings[ $safe_name ]['desc_fallback_keys'] = array_map( 'sanitize_text_field', $cpt_config['desc_fallback_keys'] );
             }
 
+            // Schema type and field mapping.
+            if ( isset( $cpt_config['schema_type'] ) ) {
+                $cpt_settings[ $safe_name ]['schema_type'] = sanitize_text_field( $cpt_config['schema_type'] );
+            }
+            if ( isset( $cpt_config['schema_fields'] ) && is_array( $cpt_config['schema_fields'] ) ) {
+                $schema_fields = array();
+                foreach ( $cpt_config['schema_fields'] as $field_key => $field_value ) {
+                    $schema_fields[ sanitize_key( $field_key ) ] = sanitize_text_field( $field_value );
+                }
+                $cpt_settings[ $safe_name ]['schema_fields'] = $schema_fields;
+            }
+
             // Title and meta description templates — can be multilingual objects or plain strings.
             foreach ( array( 'title_template', 'metadesc_template' ) as $tpl_key ) {
                 if ( isset( $cpt_config[ $tpl_key ] ) ) {
@@ -429,10 +441,20 @@ function snel_seo_get_custom_post_types_with_meta() {
             );
         }
 
+        // Get taxonomies for this CPT.
+        $tax_objects = get_object_taxonomies( $pt->name, 'objects' );
+        $taxonomies  = array();
+        foreach ( $tax_objects as $tax ) {
+            if ( $tax->public ) {
+                $taxonomies[] = array( 'name' => $tax->name, 'label' => $tax->labels->name );
+            }
+        }
+
         $result[] = array(
-            'name'   => $pt->name,
-            'label'  => $pt->labels->name,
-            'fields' => $fields,
+            'name'       => $pt->name,
+            'label'      => $pt->labels->name,
+            'fields'     => $fields,
+            'taxonomies' => $taxonomies,
         );
     }
 

@@ -85,15 +85,15 @@ Use `snel_seo_resolve_meta_field($post_id, $field_key)` — it handles all three
 | Option name | What it stores |
 |-------------|---------------|
 | `wpseo_titles` | General settings: website_name, separator, default_og_image, title/meta templates for homepage/posts/pages (multilingual as JSON strings) |
-| `snel_seo_post_type_settings` | Per-CPT config: title_template, metadesc_template, desc_fallback_keys |
-| `snel_seo_sitemap` | Sitemap settings: enabled, include_pages/posts/products, excluded_ids |
+| `snel_seo_post_type_settings` | Per-CPT config: title_template, metadesc_template, desc_fallback_keys, schema_type, schema_fields |
+| `snel_seo_sitemap` | Sitemap settings: enabled, include_pages/posts, dynamic `include_{cpt}` per public CPT, excluded_ids |
 | `snel_seo_robots_txt` | Custom robots.txt content |
 
 ### Custom Database Tables
 
 | Table | Purpose |
 |-------|---------|
-| `wp_snel_seo_redirects` | source_url, target_url, type (301/302), hits, created_at |
+| `wp_snel_seo_redirects` | source_url, target_url, type (301/302), is_pattern, hits, created_at |
 | `wp_snel_seo_404_log` | url, hits, referrer, user_agent, first_seen, last_seen |
 
 ## Multilingual System
@@ -113,6 +113,54 @@ When no custom SEO description is set for a post:
 2. **Excerpt** — if manually written
 3. **Post content** — first 155 characters
 4. **Title + site name** — last resort
+
+## JSON-LD Structured Data
+
+The plugin outputs JSON-LD schema in `<head>` on singular pages. Schema is **fully dynamic and theme-agnostic** — no hardcoded post types, meta keys, or taxonomies.
+
+### How it works
+
+1. **Organization** — always output on singular pages (site name + URL + logo)
+2. **BreadcrumbList** — always output on singular pages. If the CPT has a `taxonomy` mapped in schema_fields, the term is added as a breadcrumb level.
+3. **Per-CPT schema** — configured in **Settings > Post Types > [CPT] > Structured Data (JSON-LD)**
+
+### Configuration (per CPT)
+
+Stored in `snel_seo_post_type_settings[{cpt}]`:
+
+| Key | What it stores |
+|-----|---------------|
+| `schema_type` | Schema.org type string: `Product`, `Article`, `LocalBusiness`, `Event`, `FAQPage`, or empty (none) |
+| `schema_fields` | Object mapping schema properties to meta keys or static values |
+
+### Schema types and their fields
+
+Each schema type is defined in `src/schema-types/{type}.js`. Fields have an `input` type:
+
+- `meta` — dropdown of detected meta keys from the database (reads value per post)
+- `text` — static text value (same for all posts of this type)
+- `select` — dropdown with predefined options
+- `taxonomy` — dropdown of registered taxonomies for the CPT (used in breadcrumbs)
+
+**Product**: price (meta), priceCurrency (text), availability (meta → truthy=OutOfStock, falsy=InStock), brand (text), sku (meta), taxonomy
+**Article**: authorName (text, falls back to post author), publisherName (text, falls back to site name), taxonomy
+**LocalBusiness**: streetAddress, addressLocality, postalCode, addressCountry, telephone, openingHours, priceRange (all text)
+**Event**: startDate (meta), endDate (meta), locationName (text), locationAddress (text), price (meta), priceCurrency (text), taxonomy
+**FAQPage**: no fields (uses page content)
+
+### Adding a new schema type
+
+1. Create `src/schema-types/{type}.js` with `type`, `label`, `description`, and `fields` array
+2. Import and add to `src/schema-types/index.js`
+3. Add the PHP output logic in `inc/head-output.php` (inside the `if ( $schema_type )` block)
+
+### Theme-agnostic design
+
+- No post type names are hardcoded — all come from `get_post_types()`
+- No meta keys are hardcoded — all come from user configuration or dynamic detection
+- No taxonomy names are hardcoded — all come from `get_object_taxonomies()`
+- Sitemap dynamically discovers all public CPTs via `get_post_types()` and creates `include_{cpt}` toggles
+- Default language uses `snel_seo_get_default_lang()` everywhere, never hardcoded 'nl'
 
 ## Rules
 

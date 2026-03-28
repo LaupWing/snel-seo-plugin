@@ -150,7 +150,7 @@ add_action( 'rest_api_init', function () {
         'callback' => function ( $request ) {
             $params  = $request->get_json_params();
             $content = mb_substr( sanitize_textarea_field( $params['content'] ?? '' ), 0, 3000 );
-            $lang    = sanitize_text_field( $params['lang'] ?? 'nl' );
+            $lang    = sanitize_text_field( $params['lang'] ?? snel_seo_get_default_lang() );
 
             $api_key = SnelSeoConfig::ai_key();
             if ( empty( $api_key ) ) {

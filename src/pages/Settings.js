@@ -1,6 +1,7 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database } from 'lucide-react';
+import SCHEMA_TYPES from '../schema-types';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from '../components/TemplateInput';
 import GooglePreview from '../components/GooglePreview';
@@ -765,6 +766,112 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                             </div>
                         </div>
                     ) }
+                </div>
+
+                {/* Schema / Structured Data */ }
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Database size={ 14 } className="text-gray-500" />
+                        <label className="text-sm font-medium text-gray-700">
+                            { __( 'Structured Data (JSON-LD)', 'snel-seo' ) }
+                        </label>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-3">
+                        { __( 'Choose a schema type to output structured data for this post type. Google uses this for rich results.', 'snel-seo' ) }
+                    </p>
+
+                    <div className="space-y-3">
+                        <select
+                            value={ config.schema_type || '' }
+                            onChange={ ( e ) => updateCptConfig( activeCpt, 'schema_type', e.target.value ) }
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
+                        >
+                            <option value="">{ __( 'None — no structured data', 'snel-seo' ) }</option>
+                            { SCHEMA_TYPES.map( ( st ) => (
+                                <option key={ st.type } value={ st.type }>{ st.label }</option>
+                            ) ) }
+                        </select>
+
+                        { ( () => {
+                            const schemaType = SCHEMA_TYPES.find( ( st ) => st.type === config.schema_type );
+                            if ( ! schemaType || ! schemaType.fields.length ) return null;
+
+                            const sf = config.schema_fields || {};
+                            const updateSchemaField = ( key, value ) => {
+                                updateCptConfig( activeCpt, 'schema_fields', { ...sf, [ key ]: value } );
+                            };
+
+                            const metaOptions = fields
+                                .filter( ( f ) => f.type === 'plain' )
+                                .map( ( f ) => ( { value: f.key, label: f.label } ) );
+
+                            const taxonomies = currentCpt?.taxonomies || [];
+
+                            return (
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                                        { schemaType.label } { __( 'field mapping', 'snel-seo' ) }
+                                    </p>
+                                    { schemaType.description && (
+                                        <p className="text-xs text-gray-400 mb-2">{ schemaType.description }</p>
+                                    ) }
+
+                                    { schemaType.fields.map( ( field ) => (
+                                        <div key={ field.key } className="grid grid-cols-[160px_1fr] items-center gap-2">
+                                            <label className="text-sm text-gray-600" title={ field.description }>
+                                                { field.label }
+                                            </label>
+                                            { field.input === 'meta' && (
+                                                <select
+                                                    value={ sf[ field.key ] || '' }
+                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
+                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                                                >
+                                                    <option value="">{ __( '— skip —', 'snel-seo' ) }</option>
+                                                    { metaOptions.map( ( o ) => (
+                                                        <option key={ o.value } value={ o.value }>{ o.label }</option>
+                                                    ) ) }
+                                                </select>
+                                            ) }
+                                            { field.input === 'text' && (
+                                                <input
+                                                    type="text"
+                                                    value={ sf[ field.key ] || '' }
+                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
+                                                    placeholder={ field.placeholder || '' }
+                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                                                />
+                                            ) }
+                                            { field.input === 'select' && (
+                                                <select
+                                                    value={ sf[ field.key ] || ( field.options?.[0]?.value || '' ) }
+                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
+                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                                                >
+                                                    <option value="">{ __( '— skip —', 'snel-seo' ) }</option>
+                                                    { ( field.options || [] ).map( ( o ) => (
+                                                        <option key={ o.value } value={ o.value }>{ o.label }</option>
+                                                    ) ) }
+                                                </select>
+                                            ) }
+                                            { field.input === 'taxonomy' && (
+                                                <select
+                                                    value={ sf[ field.key ] || '' }
+                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
+                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                                                >
+                                                    <option value="">{ __( '— skip —', 'snel-seo' ) }</option>
+                                                    { taxonomies.map( ( t ) => (
+                                                        <option key={ t.name } value={ t.name }>{ t.label } ({ t.name })</option>
+                                                    ) ) }
+                                                </select>
+                                            ) }
+                                        </div>
+                                    ) ) }
+                                </div>
+                            );
+                        } )() }
+                    </div>
                 </div>
             </div>
         </div>
