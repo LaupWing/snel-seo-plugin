@@ -115,6 +115,54 @@ add_action( 'rest_api_init', function () {
         'callback'            => 'snel_seo_translate_setting',
         'permission_callback' => function () { return current_user_can( 'manage_options' ); },
     ) );
+
+    // Export all site URLs.
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/export-urls', array(
+        'methods'             => 'GET',
+        'callback'            => function () {
+            $result = array();
+
+            // Pages.
+            $pages = get_posts( array( 'post_type' => 'page', 'post_status' => 'publish', 'numberposts' => -1 ) );
+            foreach ( $pages as $page ) {
+                $result[] = array( 'url' => get_permalink( $page ), 'type' => 'page', 'title' => $page->post_title );
+            }
+
+            // Posts.
+            $posts = get_posts( array( 'post_type' => 'post', 'post_status' => 'publish', 'numberposts' => -1 ) );
+            foreach ( $posts as $post ) {
+                $result[] = array( 'url' => get_permalink( $post ), 'type' => 'post', 'title' => $post->post_title );
+            }
+
+            // All public custom post types.
+            $cpts = get_post_types( array( 'public' => true, '_builtin' => false ), 'names' );
+            foreach ( $cpts as $cpt ) {
+                $items = get_posts( array( 'post_type' => $cpt, 'post_status' => 'publish', 'numberposts' => -1 ) );
+                foreach ( $items as $item ) {
+                    $result[] = array( 'url' => get_permalink( $item ), 'type' => $cpt, 'title' => $item->post_title );
+                }
+            }
+
+            // Public taxonomy term archives.
+            $taxonomies = get_taxonomies( array( 'public' => true ), 'names' );
+            foreach ( $taxonomies as $tax ) {
+                $terms = get_terms( array( 'taxonomy' => $tax, 'hide_empty' => false ) );
+                if ( is_wp_error( $terms ) ) continue;
+                foreach ( $terms as $term ) {
+                    $link = get_term_link( $term );
+                    if ( ! is_wp_error( $link ) ) {
+                        $result[] = array( 'url' => $link, 'type' => $tax, 'title' => $term->name );
+                    }
+                }
+            }
+
+            return rest_ensure_response( array(
+                'total' => count( $result ),
+                'urls'  => $result,
+            ) );
+        },
+        'permission_callback' => function () { return current_user_can( 'manage_options' ); },
+    ) );
 } );
 
 function snel_seo_save_settings( WP_REST_Request $request ) {

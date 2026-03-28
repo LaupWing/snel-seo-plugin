@@ -1,6 +1,6 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Download, Upload, FileCode, Save, RotateCcw, Loader2 } from 'lucide-react';
+import { Download, Upload, FileCode, Save, RotateCcw, Loader2, Globe } from 'lucide-react';
 
 function RobotsEditor() {
     const [ content, setContent ] = useState( '' );
@@ -104,6 +104,67 @@ function RobotsEditor() {
     );
 }
 
+function ExportUrls() {
+    const [ exporting, setExporting ] = useState( false );
+    const [ stats, setStats ] = useState( null );
+
+    const handleExport = async () => {
+        setExporting( true );
+        try {
+            const res = await fetch( `${ window.snelSeo.restUrl }/export-urls`, {
+                headers: { 'X-WP-Nonce': window.snelSeo.nonce },
+            } );
+            const data = await res.json();
+            setStats( data.total );
+
+            // Group by type for the JSON output.
+            const grouped = {};
+            data.urls.forEach( ( item ) => {
+                if ( ! grouped[ item.type ] ) grouped[ item.type ] = [];
+                grouped[ item.type ].push( item.url );
+            } );
+
+            const blob = new Blob( [ JSON.stringify( grouped, null, 2 ) ], { type: 'application/json' } );
+            const url = URL.createObjectURL( blob );
+            const a = document.createElement( 'a' );
+            a.href = url;
+            a.download = `site-urls-${ new Date().toISOString().slice( 0, 10 ) }.json`;
+            a.click();
+            URL.revokeObjectURL( url );
+        } catch { /* ignore */ }
+        setExporting( false );
+    };
+
+    return (
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-purple-50 rounded-lg flex items-center justify-center">
+                    <Globe size={ 16 } className="text-purple-600" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900">
+                    { __( 'Export All URLs', 'snel-seo' ) }
+                </h2>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+                { __( 'Download every URL on your site as JSON — pages, posts, products, categories. Use for redirect testing or migration snapshots.', 'snel-seo' ) }
+            </p>
+            <div className="flex items-center gap-3">
+                <button
+                    onClick={ handleExport }
+                    disabled={ exporting }
+                    className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                    { exporting ? <Loader2 size={ 14 } className="animate-spin" /> : <Download size={ 14 } /> }
+                    { exporting ? __( 'Exporting...', 'snel-seo' ) : __( 'Export JSON', 'snel-seo' ) }
+                </button>
+                { stats !== null && (
+                    <span className="text-xs text-gray-400">{ stats } { __( 'URLs exported', 'snel-seo' ) }</span>
+                ) }
+            </div>
+        </div>
+    );
+}
+
 export default function Tools() {
     return (
         <div className="p-6">
@@ -154,6 +215,9 @@ export default function Tools() {
                         { __( 'Import JSON', 'snel-seo' ) }
                     </button>
                 </div>
+
+                {/* Export All URLs */}
+                <ExportUrls />
 
                 {/* Robots.txt */}
                 <div className="bg-white border border-gray-200 rounded-lg p-5 md:col-span-2">
