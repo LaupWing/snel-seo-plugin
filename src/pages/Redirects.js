@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Modal, SelectControl } from '@wordpress/components';
-import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk } from 'lucide-react';
+import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk, FlaskConical, CheckCircle2, XCircle, Filter } from 'lucide-react';
 import Tabs from '../components/Tabs';
 
 const TABS = [
@@ -309,6 +309,17 @@ export default function Redirects() {
     const [ currentPage, setCurrentPage ] = useState( 1 );
     const perPage = 20;
 
+    // Test redirects state.
+    const [ showTestModal, setShowTestModal ] = useState( false );
+    const [ testInput, setTestInput ] = useState( '' );
+    const [ testResults, setTestResults ] = useState( [] );
+    const [ testRunning, setTestRunning ] = useState( false );
+    const [ testProgress, setTestProgress ] = useState( { done: 0, total: 0 } );
+    const [ testFilter, setTestFilter ] = useState( 'all' );
+    const [ testSearchQuery, setTestSearchQuery ] = useState( '' );
+    const [ testPage, setTestPage ] = useState( 1 );
+    const testPerPage = 20;
+
     // Filter and paginate
     const filtered = redirects.filter( ( r ) =>
         ! searchQuery || r.source_url.toLowerCase().includes( searchQuery.toLowerCase() ) || r.target_url.toLowerCase().includes( searchQuery.toLowerCase() )
@@ -350,6 +361,58 @@ export default function Redirects() {
         } catch ( e ) { /* ignore */ }
     };
 
+    const handleTestRedirects = async ( urls ) => {
+        if ( ! urls.length ) return;
+        setTestRunning( true );
+        setTestResults( [] );
+        setTestFilter( 'all' );
+        setTestSearchQuery( '' );
+        setTestPage( 1 );
+
+        const batchSize = 100;
+        const total = urls.length;
+        setTestProgress( { done: 0, total } );
+        const allResults = [];
+
+        for ( let i = 0; i < total; i += batchSize ) {
+            const batch = urls.slice( i, i + batchSize );
+            try {
+                const res = await fetch( `${ window.snelSeo.restUrl }/redirects/test`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                    body: JSON.stringify( batch ),
+                } );
+                const data = await res.json();
+                allResults.push( ...data );
+                setTestResults( [ ...allResults ] );
+                setTestProgress( { done: Math.min( i + batchSize, total ), total } );
+            } catch { /* ignore */ }
+        }
+
+        setTestRunning( false );
+        setTestProgress( { done: total, total } );
+    };
+
+    const openTestModal = () => {
+        setShowTestModal( true );
+        setTestInput( '' );
+        setTestResults( [] );
+        setTestRunning( false );
+        setTestProgress( { done: 0, total: 0 } );
+        setTestFilter( 'all' );
+        setTestSearchQuery( '' );
+        setTestPage( 1 );
+    };
+
+    const testOkCount = testResults.filter( ( r ) => r.status === 'ok' ).length;
+    const testFailCount = testResults.filter( ( r ) => r.status === 'missing' ).length;
+
+    const testFiltered = testResults
+        .filter( ( r ) => testFilter === 'all' || ( testFilter === 'ok' && r.status === 'ok' ) || ( testFilter === 'missing' && r.status === 'missing' ) )
+        .filter( ( r ) => ! testSearchQuery || r.url.toLowerCase().includes( testSearchQuery.toLowerCase() ) || ( r.target && r.target.toLowerCase().includes( testSearchQuery.toLowerCase() ) ) );
+    const testTotalPages = Math.ceil( testFiltered.length / testPerPage );
+    const testPaginated = testFiltered.slice( ( testPage - 1 ) * testPerPage, testPage * testPerPage );
+
     return (
         <div className="p-6">
             {/* Header */}
@@ -373,6 +436,13 @@ export default function Redirects() {
                                 { __( 'Clear All', 'snel-seo' ) }
                             </button>
                         ) }
+                        <button
+                            onClick={ openTestModal }
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors"
+                        >
+                            <FlaskConical size={ 14 } />
+                            { __( 'Test Redirects', 'snel-seo' ) }
+                        </button>
                         <label className={ `flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${ importing ? 'opacity-50 pointer-events-none' : '' }` }>
                             { importing ? <Loader2 size={ 14 } className="animate-spin" /> : <Upload size={ 14 } /> }
                             { importing ? __( 'Importing...', 'snel-seo' ) : __( 'Import JSON', 'snel-seo' ) }
@@ -620,6 +690,211 @@ export default function Redirects() {
                                 { editingId ? __( 'Save Changes', 'snel-seo' ) : __( 'Add Redirect', 'snel-seo' ) }
                             </button>
                         </div>
+                    </div>
+                </Modal>
+            ) }
+
+            {/* Test Redirects Modal */}
+            { showTestModal && (
+                <Modal
+                    title={ __( 'Test Redirects', 'snel-seo' ) }
+                    onRequestClose={ () => setShowTestModal( false ) }
+                    className="snel-seo-test-modal"
+                    style={ { maxWidth: '800px', width: '100%' } }
+                >
+                    <div className="space-y-4">
+                        {/* Input phase — show when no results yet and not running */ }
+                        { testResults.length === 0 && ! testRunning && (
+                            <>
+                                <p className="text-sm text-gray-500">
+                                    { __( 'Paste URLs (one per line) to check if they have matching redirects.', 'snel-seo' ) }
+                                </p>
+                                <textarea
+                                    value={ testInput }
+                                    onChange={ ( e ) => setTestInput( e.target.value ) }
+                                    placeholder={ '/old-page-1\n/old-page-2\nhttp://antiquewarehouse.nl/producten/show/123' }
+                                    rows={ 10 }
+                                    className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 focus:shadow-[0_0_0_1px_#a855f7] resize-y"
+                                />
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-400">
+                                        { testInput.trim() ? `${ testInput.trim().split( '\n' ).filter( Boolean ).length } URLs` : '' }
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={ () => {
+                                                const allUrls = redirects.map( ( r ) => r.source_url );
+                                                if ( ! allUrls.length ) return;
+                                                setTestInput( allUrls.join( '\n' ) );
+                                            } }
+                                            disabled={ ! redirects.length }
+                                            className="px-3 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-30"
+                                        >
+                                            { __( 'Load All Redirects', 'snel-seo' ) }
+                                        </button>
+                                        <button
+                                            onClick={ () => {
+                                                const urls = testInput.trim().split( '\n' ).map( ( u ) => u.trim() ).filter( Boolean );
+                                                handleTestRedirects( urls );
+                                            } }
+                                            disabled={ ! testInput.trim() }
+                                            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50"
+                                        >
+                                            <FlaskConical size={ 14 } />
+                                            { __( 'Run Test', 'snel-seo' ) }
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        ) }
+
+                        {/* Progress bar */ }
+                        { testRunning && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="flex items-center gap-2 text-purple-600">
+                                        <Loader2 size={ 14 } className="animate-spin" />
+                                        { __( 'Testing redirects...', 'snel-seo' ) }
+                                    </span>
+                                    <span className="text-gray-500 font-mono">
+                                        { testProgress.done } / { testProgress.total }
+                                    </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                                        style={ { width: `${ testProgress.total ? ( testProgress.done / testProgress.total ) * 100 : 0 }%` } }
+                                    />
+                                </div>
+                                { testResults.length > 0 && (
+                                    <div className="flex items-center gap-4 text-xs">
+                                        <span className="flex items-center gap-1 text-emerald-600">
+                                            <CheckCircle2 size={ 12 } /> { testOkCount } { __( 'working', 'snel-seo' ) }
+                                        </span>
+                                        <span className="flex items-center gap-1 text-red-500">
+                                            <XCircle size={ 12 } /> { testFailCount } { __( 'missing', 'snel-seo' ) }
+                                        </span>
+                                    </div>
+                                ) }
+                            </div>
+                        ) }
+
+                        {/* Results phase */ }
+                        { ! testRunning && testResults.length > 0 && (
+                            <>
+                                {/* Summary */ }
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-4 text-sm">
+                                        <span className="flex items-center gap-1.5 text-emerald-600 font-medium">
+                                            <CheckCircle2 size={ 16 } /> { testOkCount } { __( 'working', 'snel-seo' ) }
+                                        </span>
+                                        <span className="flex items-center gap-1.5 text-red-500 font-medium">
+                                            <XCircle size={ 16 } /> { testFailCount } { __( 'missing', 'snel-seo' ) }
+                                        </span>
+                                    </div>
+                                    <button
+                                        onClick={ () => { setTestResults( [] ); setTestInput( '' ); } }
+                                        className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                                    >
+                                        { __( 'New Test', 'snel-seo' ) }
+                                    </button>
+                                </div>
+
+                                {/* Filters + Search */ }
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                                        { [ 'all', 'ok', 'missing' ].map( ( f ) => (
+                                            <button
+                                                key={ f }
+                                                onClick={ () => { setTestFilter( f ); setTestPage( 1 ); } }
+                                                className={ `px-3 py-1 text-xs font-medium rounded-md transition-colors ${ testFilter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700' }` }
+                                            >
+                                                { f === 'all' ? `${ __( 'All', 'snel-seo' ) } (${ testResults.length })` : f === 'ok' ? `${ __( 'Working', 'snel-seo' ) } (${ testOkCount })` : `${ __( 'Missing', 'snel-seo' ) } (${ testFailCount })` }
+                                            </button>
+                                        ) ) }
+                                    </div>
+                                    <div className="flex-1 relative">
+                                        <Search size={ 12 } className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            value={ testSearchQuery }
+                                            onChange={ ( e ) => { setTestSearchQuery( e.target.value ); setTestPage( 1 ); } }
+                                            placeholder={ __( 'Search URLs...', 'snel-seo' ) }
+                                            className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:border-purple-500 focus:shadow-[0_0_0_1px_#a855f7]"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Results table */ }
+                                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="sticky top-0 z-10">
+                                            <tr className="border-b border-gray-200 bg-gray-50">
+                                                <th className="w-8 px-3 py-2" />
+                                                <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">
+                                                    { __( 'URL', 'snel-seo' ) }
+                                                </th>
+                                                <th className="text-left px-3 py-2 font-medium text-gray-600 text-xs">
+                                                    { __( 'Redirects to', 'snel-seo' ) }
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            { testPaginated.map( ( r, i ) => (
+                                                <tr key={ i } className={ `border-b border-gray-50 ${ r.status === 'missing' ? 'bg-red-50/50' : '' }` }>
+                                                    <td className="px-3 py-2 text-center">
+                                                        { r.status === 'ok'
+                                                            ? <CheckCircle2 size={ 14 } className="text-emerald-500" />
+                                                            : <XCircle size={ 14 } className="text-red-400" />
+                                                        }
+                                                    </td>
+                                                    <td className="px-3 py-2 font-mono text-xs text-gray-700 break-all">
+                                                        { r.url }
+                                                        { r.pattern && (
+                                                            <span className="ml-1.5 text-[10px] text-purple-600 bg-purple-50 px-1 py-0.5 rounded">
+                                                                { r.pattern }
+                                                            </span>
+                                                        ) }
+                                                    </td>
+                                                    <td className="px-3 py-2 font-mono text-xs break-all">
+                                                        { r.target
+                                                            ? <span className="text-blue-600">{ r.target }</span>
+                                                            : <span className="text-red-400 italic">{ __( 'No redirect found', 'snel-seo' ) }</span>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            ) ) }
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Pagination */ }
+                                { testTotalPages > 1 && (
+                                    <div className="flex items-center justify-between text-xs text-gray-500">
+                                        <span>
+                                            { __( 'Showing', 'snel-seo' ) } { ( testPage - 1 ) * testPerPage + 1 }–{ Math.min( testPage * testPerPage, testFiltered.length ) } { __( 'of', 'snel-seo' ) } { testFiltered.length }
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={ () => setTestPage( ( p ) => Math.max( 1, p - 1 ) ) }
+                                                disabled={ testPage === 1 }
+                                                className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors"
+                                            >
+                                                <ChevronLeft size={ 12 } />
+                                            </button>
+                                            <span className="px-2">{ testPage } / { testTotalPages }</span>
+                                            <button
+                                                onClick={ () => setTestPage( ( p ) => Math.min( testTotalPages, p + 1 ) ) }
+                                                disabled={ testPage === testTotalPages }
+                                                className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 transition-colors"
+                                            >
+                                                <ChevronRight size={ 12 } />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) }
+                            </>
+                        ) }
                     </div>
                 </Modal>
             ) }

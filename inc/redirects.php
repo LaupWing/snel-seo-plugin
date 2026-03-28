@@ -302,6 +302,76 @@ add_action( 'rest_api_init', function () {
         },
     ) );
 
+    // Bulk test — check which URLs have a matching redirect.
+    register_rest_route( SnelSeoConfig::$rest_namespace, '/redirects/test', array(
+        'methods'             => 'POST',
+        'callback'            => function ( $request ) {
+            global $wpdb;
+            $table = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
+            $urls  = $request->get_json_params();
+
+            if ( ! is_array( $urls ) ) {
+                return new WP_Error( 'invalid_format', 'Expected a JSON array of URL strings.', array( 'status' => 400 ) );
+            }
+
+            // Load all redirects once.
+            $exact    = $wpdb->get_results( "SELECT source_url, target_url, type FROM $table WHERE is_pattern = 0", ARRAY_A );
+            $patterns = $wpdb->get_results( "SELECT source_url, target_url, type FROM $table WHERE is_pattern = 1", ARRAY_A );
+
+            $exact_map = array();
+            foreach ( $exact as $r ) {
+                $exact_map[ $r['source_url'] ] = $r;
+            }
+
+            $results = array();
+            foreach ( $urls as $raw_url ) {
+                $path = '/' . trim( wp_parse_url( sanitize_text_field( $raw_url ), PHP_URL_PATH ) ?: $raw_url, '/' );
+
+                // Check exact match.
+                if ( isset( $exact_map[ $path ] ) ) {
+                    $results[] = array(
+                        'url'    => $path,
+                        'status' => 'ok',
+                        'target' => $exact_map[ $path ]['target_url'],
+                        'type'   => (int) $exact_map[ $path ]['type'],
+                    );
+                    continue;
+                }
+
+                // Check pattern match.
+                $matched = false;
+                foreach ( $patterns as $p ) {
+                    $prefix = rtrim( $p['source_url'], '/*' );
+                    if ( strpos( $path, $prefix . '/' ) === 0 || $path === $prefix ) {
+                        $results[] = array(
+                            'url'     => $path,
+                            'status'  => 'ok',
+                            'target'  => $p['target_url'],
+                            'type'    => (int) $p['type'],
+                            'pattern' => $p['source_url'] . '/*',
+                        );
+                        $matched = true;
+                        break;
+                    }
+                }
+
+                if ( ! $matched ) {
+                    $results[] = array(
+                        'url'    => $path,
+                        'status' => 'missing',
+                        'target' => null,
+                        'type'   => null,
+                    );
+                }
+            }
+
+            return rest_ensure_response( $results );
+        },
+        'permission_callback' => function () {
+            return current_user_can( 'manage_options' );
+        },
+    ) );
+
     // Bulk delete all.
     register_rest_route( SnelSeoConfig::$rest_namespace, '/redirects/all', array(
         'methods'             => 'DELETE',

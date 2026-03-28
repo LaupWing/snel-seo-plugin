@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Snel SEO
  * Description: Lightweight SEO toolkit by Snelstack. Yoast-compatible, zero bloat.
- * Version: 1.3.1
+ * Version: 1.4.0
  * Author: Snelstack
  * Author URI: https://snelstack.com
  * License: GPL v2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'SNEL_SEO_VERSION', '1.3.1' );
+define( 'SNEL_SEO_VERSION', '1.4.0' );
 define( 'SNEL_SEO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SNEL_SEO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -27,8 +27,10 @@ $snel_seo_updater = PucFactory::buildUpdateChecker(
     __FILE__,
     'snel-seo'
 );
-$snel_seo_updater->setAuthentication( defined( 'SNEL_SEO_GITHUB_TOKEN' ) ? SNEL_SEO_GITHUB_TOKEN : '' );
-$snel_seo_updater->getVcsApi()->enableReleaseAssets();
+$snel_seo_updater->setAuthentication( defined( 'SNEL_SEO_GITHUB_TOKEN' ) ? constant( 'SNEL_SEO_GITHUB_TOKEN' ) : '' );
+/** @var \YahnisElsts\PluginUpdateChecker\v5p5\Vcs\GitHubApi $api */
+$api = $snel_seo_updater->getVcsApi();
+$api->enableReleaseAssets();
 
 // Load modules.
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/config.php';
