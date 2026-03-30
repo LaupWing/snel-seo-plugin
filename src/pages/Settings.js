@@ -430,18 +430,18 @@ export default function Settings() {
                 { activeTab === 'general' && (
                     <div className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-0.5">
                                 { __( 'Website Name', 'snel-seo' ) }
                             </label>
+                            <p className="text-[11px] text-gray-400 mb-1.5">
+                                { __( 'Used in title templates as %%sitename%%', 'snel-seo' ) }
+                            </p>
                             <input
                                 type="text"
                                 value={ settings.website_name || '' }
                                 onChange={ ( e ) => update( 'website_name', e.target.value ) }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Used in title templates as %%sitename%%', 'snel-seo' ) }
-                            </p>
                         </div>
                         <div>
                             <div className="flex items-center gap-3 mb-1">
@@ -482,20 +482,23 @@ export default function Settings() {
                                     </div>
                                 ) }
                             </div>
+                            <p className="text-[11px] text-gray-400 mb-1.5">
+                                { __( 'Used in title templates as %%sitedesc%%. Falls back to WordPress tagline if empty.', 'snel-seo' ) }
+                            </p>
                             <input
                                 type="text"
                                 value={ getTaglineVal() }
                                 onChange={ ( e ) => updateTagline( e.target.value ) }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Used in title templates as %%sitedesc%%. Falls back to WordPress tagline if empty.', 'snel-seo' ) }
-                            </p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-0.5">
                                 { __( 'Title Separator', 'snel-seo' ) }
                             </label>
+                            <p className="text-[11px] text-gray-400 mb-1.5">
+                                { __( 'Used in title templates as %%separator%%', 'snel-seo' ) }
+                            </p>
                             <div className="flex gap-2">
                                 { SEPARATORS.map( ( sep ) => (
                                     <button
@@ -510,9 +513,6 @@ export default function Settings() {
                                     </button>
                                 ) ) }
                             </div>
-                            <p className="mt-1 text-xs text-gray-400">
-                                { __( 'Used in title templates as %%separator%%', 'snel-seo' ) }
-                            </p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
