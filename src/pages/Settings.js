@@ -404,25 +404,34 @@ export default function Settings() {
                             </p>
                         </div>
                         <div>
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-3 mb-1">
                                 <label className="text-sm font-medium text-gray-700">
                                     { __( 'Site Tagline', 'snel-seo' ) }
                                     { isMultilingual && ` (${ taglineLang.toUpperCase() })` }
                                 </label>
                                 { isMultilingual && (
                                     <div className="flex items-center gap-1.5">
-                                        { languages.map( ( lang ) => (
-                                            <button
-                                                key={ lang.code }
-                                                onClick={ () => setTaglineLang( lang.code ) }
-                                                className={ `px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${ taglineLang === lang.code
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                                }` }
-                                            >
-                                                { lang.label }
-                                            </button>
-                                        ) ) }
+                                        { languages.map( ( lang ) => {
+                                            const hasVal = !! getLangValue( settings, 'site_tagline', lang.code );
+                                            return (
+                                                <button
+                                                    key={ lang.code }
+                                                    onClick={ () => setTaglineLang( lang.code ) }
+                                                    className={ `px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${ taglineLang === lang.code
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                    }` }
+                                                >
+                                                    { lang.label }
+                                                    { ! lang.default && hasVal && (
+                                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                                                    ) }
+                                                    { ! lang.default && ! hasVal && getLangValue( settings, 'site_tagline', defaultLang ) && (
+                                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                                    ) }
+                                                </button>
+                                            );
+                                        } ) }
                                         <button
                                             onClick={ handleTranslateTagline }
                                             disabled={ translatingTagline || ! getLangValue( settings, 'site_tagline', defaultLang ) }
@@ -436,9 +445,8 @@ export default function Settings() {
                             </div>
                             <input
                                 type="text"
-                                value={ getTaglineVal() }
+                                value={ getTaglineVal() || ( taglineLang === defaultLang ? ( window.snelSeo?.siteDesc || '' ) : '' ) }
                                 onChange={ ( e ) => updateTagline( e.target.value ) }
-                                placeholder={ window.snelSeo?.siteDesc || '' }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
                             <p className="mt-1 text-xs text-gray-400">
