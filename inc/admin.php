@@ -261,6 +261,7 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
 
 /**
  * Translate a settings template text to another language via OpenAI.
+ * Uses snel_seo_translate_text() which safely preserves %%tags%%.
  */
 function snel_seo_translate_setting( WP_REST_Request $request ) {
     $params = $request->get_json_params();
@@ -268,51 +269,11 @@ function snel_seo_translate_setting( WP_REST_Request $request ) {
     $lang   = sanitize_key( $params['lang'] ?? '' );
     $type   = sanitize_key( $params['type'] ?? 'description' );
 
-    if ( ! $text || ! $lang ) {
-        return new WP_Error( 'missing_params', 'Text and lang are required.', array( 'status' => 400 ) );
+    $result = snel_seo_translate_text( $text, $lang, $type );
+
+    if ( is_wp_error( $result ) ) {
+        return $result;
     }
-
-    $api_key = SnelSeoConfig::ai_key();
-    if ( empty( $api_key ) ) {
-        return new WP_Error( 'no_api_key', 'OpenAI API key not configured. Go to Snelstack Settings to add your key.', array( 'status' => 400 ) );
-    }
-
-    $lang_name     = SnelSeoConfig::lang_name( $lang );
-    $max_title     = SnelSeoConfig::$max_title_length;
-    $max_desc      = SnelSeoConfig::$max_desc_length;
-
-    if ( 'title' === $type ) {
-        $prompt = "Translate this SEO title template to {$lang_name}. "
-                . "Keep template variables like %%sitename%%, %%separator%%, %%sitedesc%%, %%title%% exactly as they are — do not translate them. "
-                . "Only translate the human-readable text parts. Keep it under {$max_title} characters. "
-                . "Return ONLY the translated title, nothing else.\n\nTitle: {$text}";
-    } else {
-        $prompt = "Translate this SEO meta description to {$lang_name}. "
-                . "Keep template variables like %%sitename%%, %%sitedesc%% exactly as they are — do not translate them. "
-                . "Only translate the human-readable text parts. Keep it between 120-{$max_desc} characters. "
-                . "Return ONLY the translated description, nothing else.\n\nDescription: {$text}";
-    }
-
-    $response = wp_remote_post( SnelSeoConfig::$ai_api_url, array(
-        'timeout' => 30,
-        'headers' => array( 'Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json' ),
-        'body'    => wp_json_encode( array(
-            'model'       => SnelSeoConfig::ai_model(),
-            'messages'    => array(
-                array( 'role' => 'system', 'content' => 'You are a professional translator specializing in SEO content. Translate accurately while preserving template variables.' ),
-                array( 'role' => 'user', 'content' => $prompt ),
-            ),
-            'temperature' => SnelSeoConfig::$ai_temp_translation,
-        ) ),
-    ) );
-
-    if ( is_wp_error( $response ) ) {
-        return new WP_Error( 'api_error', $response->get_error_message(), array( 'status' => 500 ) );
-    }
-
-    $body = json_decode( wp_remote_retrieve_body( $response ), true );
-    $result = $body['choices'][0]['message']['content'] ?? '';
-    $result = trim( $result, " \t\n\r\0\x0B\"'" );
 
     return rest_ensure_response( array( 'result' => $result ) );
 }

@@ -35,6 +35,7 @@ $api->enableReleaseAssets();
 // Load modules.
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/config.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/languages.php';
+require_once SNEL_SEO_PLUGIN_DIR . 'inc/translate.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/redirects.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/head-output.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/robots.php';

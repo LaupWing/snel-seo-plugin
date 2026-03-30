@@ -490,6 +490,9 @@ export default function Settings() {
                                     </button>
                                 ) ) }
                             </div>
+                            <p className="mt-1 text-xs text-gray-400">
+                                { __( 'Used in title templates as %%separator%%', 'snel-seo' ) }
+                            </p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
