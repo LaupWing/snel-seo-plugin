@@ -6,7 +6,7 @@ import { TEMPLATE_BADGES } from '../config';
 
 export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action, placeholder, showReset: showResetProp } ) {
     const inputRef = useRef( null );
-    const badges = TEMPLATE_BADGES[ badgeGroup ] || TEMPLATE_BADGES.page;
+    const badges = badgeGroup ? ( TEMPLATE_BADGES[ badgeGroup ] || [] ) : [];
 
     const insertVariable = ( variable ) => {
         const input = inputRef.current;
