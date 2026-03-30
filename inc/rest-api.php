@@ -234,11 +234,37 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     $site_name = isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' );
     $separator = snel_seo_get_separator();
 
+    // Get the title template for this post type.
+    $post_type      = $post->post_type;
+    $cpt_settings   = get_option( SnelSeoConfig::$option_cpt, array() );
+    $title_template = '';
+
+    // Check CPT-specific template first, then fall back to post/page defaults.
+    if ( isset( $cpt_settings[ $post_type ]['title_template'] ) ) {
+        $tpl = $cpt_settings[ $post_type ]['title_template'];
+        $title_template = is_array( $tpl ) ? ( $tpl[ snel_seo_get_default_lang() ] ?? '' ) : $tpl;
+    }
+    if ( ! $title_template ) {
+        $tpl_key        = 'page' === $post_type ? 'title-page' : 'title-post';
+        $raw_tpl        = $settings[ $tpl_key ] ?? '';
+        $decoded_tpl    = is_string( $raw_tpl ) ? json_decode( $raw_tpl, true ) : null;
+        $title_template = is_array( $decoded_tpl ) ? ( $decoded_tpl[ snel_seo_get_default_lang() ] ?? '' ) : $raw_tpl;
+    }
+    if ( ! $title_template ) {
+        $title_template = '%%title%% %%separator%% %%sitename%%';
+    }
+
+    // Calculate max length for the title part only (subtract separator + site name).
+    $template_without_title = str_replace( '%%title%%', '', $title_template );
+    $template_without_title = str_replace( '%%separator%%', $separator, $template_without_title );
+    $template_without_title = str_replace( '%%sitename%%', $site_name, $template_without_title );
+    $max_title_part         = max( 20, $max_title - mb_strlen( $template_without_title ) );
+
     if ( 'title' === $type ) {
-        $prompt = "Generate an SEO-optimized title in {$lang_name} for the following page. "
-                . "The format should be: [compelling page title] {$separator} {$site_name}. "
-                . "The total length must be under {$max_title} characters including the separator and site name. "
-                . "Write in {$lang_name}. Return ONLY the full title with separator and site name, nothing else.\n\n"
+        $prompt = "Generate an SEO-optimized page title in {$lang_name} for the following page. "
+                . "Generate ONLY the page title text — do NOT include a site name, separator, or brand name. "
+                . "Keep it under {$max_title_part} characters. "
+                . "Write in {$lang_name}. Return ONLY the page title, nothing else.\n\n"
                 . "Page title: {$title}\nPage content: {$content}";
     } elseif ( 'keyphrase' === $type ) {
         $source_kw = sanitize_text_field( $params['source_keyphrase'] ?? '' );
@@ -284,6 +310,15 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
         return mb_convert_encoding( pack( 'H*', $m[1] ), 'UTF-8', 'UCS-2BE' );
     }, $result );
     $result = html_entity_decode( $result, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
+
+    // For titles: assemble full title using the template so site name is never AI-translated.
+    if ( 'title' === $type && $result ) {
+        $full_title = str_replace( '%%title%%', $result, $title_template );
+        $full_title = str_replace( '%%separator%%', $separator, $full_title );
+        $full_title = str_replace( '%%sitename%%', $site_name, $full_title );
+        $full_title = str_replace( '%%sitedesc%%', get_bloginfo( 'description' ), $full_title );
+        $result     = $full_title;
+    }
 
     return rest_ensure_response( array( 'result' => $result ) );
 }
