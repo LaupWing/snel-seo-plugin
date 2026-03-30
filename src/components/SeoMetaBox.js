@@ -281,6 +281,9 @@ export default function SeoMetaBox() {
                                     { ! lang.default && ( ! seoTitle[ lang.code ] || ! metaDesc[ lang.code ] ) && ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
                                     ) }
+                                    { ! lang.default && ! seoTitle[ lang.code ] && ! metaDesc[ lang.code ] && (
+                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                                    ) }
                                 </button>
                             ) ) }
                         </div>

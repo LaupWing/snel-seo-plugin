@@ -384,6 +384,9 @@ export default function Settings() {
                                     { ! lang.default && ( hasTitle || hasDesc ) && ! ( hasTitle && hasDesc ) && (
                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
                                     ) }
+                                    { ! lang.default && ! hasTitle && ! hasDesc && (
+                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                                    ) }
                                 </button>
                             );
                         } ) }
@@ -469,6 +472,9 @@ export default function Settings() {
                                                     ) }
                                                     { ! lang.default && ! hasVal && getTaglineSource() && (
                                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                                    ) }
+                                                    { ! lang.default && ! hasVal && ! getTaglineSource() && (
+                                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
                                                     ) }
                                                 </button>
                                             );
