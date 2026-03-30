@@ -68,6 +68,7 @@ export default function Settings() {
     defaultLangGlobal = defaultLang;
     const [ activeLang, setActiveLang ] = useState( defaultLang );
 
+
     // Pre-fill empty languages with default language values on mount.
     useState( () => {
         if ( ! isMultilingual ) return;
@@ -163,9 +164,19 @@ export default function Settings() {
                             ...prev,
                             [ key ]: setLangValue( prev, key, lang.code, data.result ),
                         } ) );
+                    } else if ( data.code || data.message ) {
+                        setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+                        setTranslatingAll( false );
+                        setBtnText( null );
+                        setBtnAnimStyle( {} );
+                        return;
                     }
-                } catch {
-                    // Continue with next key
+                } catch ( err ) {
+                    setNotice( { type: 'error', message: __( 'Network error during translation.', 'snel-seo' ) } );
+                    setTranslatingAll( false );
+                    setBtnText( null );
+                    setBtnAnimStyle( {} );
+                    return;
                 }
             }
 
