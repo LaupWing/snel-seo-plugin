@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Snel SEO
  * Description: Lightweight SEO toolkit by Snelstack. Yoast-compatible, zero bloat.
- * Version: 1.6.0
+ * Version: 1.7.0
  * Author: Snelstack
  * Author URI: https://snelstack.com
  * License: GPL v2 or later
