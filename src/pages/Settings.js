@@ -155,6 +155,31 @@ export default function Settings() {
         await new Promise( ( r ) => setTimeout( r, 1200 ) );
     };
 
+    // Single-field translate — translates one key to the active language.
+    const handleTranslateSingle = ( key, type ) => async ( { animateText } ) => {
+        const sourceText = getLangValue( settings, key, defaultLang );
+        if ( ! sourceText ) return;
+
+        await animateText( `✦ Translating ${ activeLang.toUpperCase() }...` );
+
+        const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+            body: JSON.stringify( { text: sourceText, lang: activeLang, type } ),
+        } );
+        const data = await res.json();
+        if ( data.result ) {
+            setSettings( ( prev ) => ( {
+                ...prev,
+                [ key ]: setLangValue( prev, key, activeLang, data.result ),
+            } ) );
+            await animateText( '✓ Done' );
+            await new Promise( ( r ) => setTimeout( r, 1000 ) );
+        } else if ( data.code || data.message ) {
+            setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+        }
+    };
+
     const update = ( key, value ) => {
         if ( MULTILINGUAL_KEYS.includes( key ) && isMultilingual ) {
             setSettings( ( prev ) => ( {
@@ -386,9 +411,11 @@ export default function Settings() {
                                     ) : (
                                         <span className="inline-flex items-center gap-1.5">
                                             <Languages size={ 12 } />
-                                            { missingCount > 0
-                                                ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
-                                                : __( 'Re-translate All', 'snel-seo' )
+                                            { activeLang === defaultLang
+                                                ? ( missingCount > 0
+                                                    ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
+                                                    : __( 'Re-translate All', 'snel-seo' ) )
+                                                : `${ __( 'Translate All for', 'snel-seo' ) } ${ activeLang.toUpperCase() }`
                                             }
                                         </span>
                                     ) }
@@ -536,20 +563,46 @@ export default function Settings() {
 
                 { activeTab === 'homepage' && (
                     <div className="space-y-6">
-                        <TemplateInput
-                            label={ __( 'SEO Title', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ getVal( 'title_home' ) }
-                            onChange={ ( v ) => update( 'title_home', v ) }
-                            badgeGroup="homepage"
-                            defaultValue="%%sitename%% %%separator%% %%sitedesc%%"
-                        />
-                        <TemplateInput
-                            label={ __( 'Meta Description', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ getVal( 'metadesc_home' ) }
-                            onChange={ ( v ) => update( 'metadesc_home', v ) }
-                            badgeGroup="homepage"
-                            maxLength={ MAX_DESC_LENGTH }
-                        />
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-700">
+                                    { __( 'SEO Title', 'snel-seo' ) }{ isMultilingual && ` (${ activeLang.toUpperCase() })` }
+                                </span>
+                                { isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'title_home', defaultLang ) && (
+                                    <TranslateButton
+                                        onTranslate={ handleTranslateSingle( 'title_home', 'title' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                            <TemplateInput
+                                value={ getVal( 'title_home' ) }
+                                onChange={ ( v ) => update( 'title_home', v ) }
+                                badgeGroup="homepage"
+                                defaultValue="%%sitename%% %%separator%% %%sitedesc%%"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-700">
+                                    { __( 'Meta Description', 'snel-seo' ) }{ isMultilingual && ` (${ activeLang.toUpperCase() })` }
+                                </span>
+                                { isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_home', defaultLang ) && (
+                                    <TranslateButton
+                                        onTranslate={ handleTranslateSingle( 'metadesc_home', 'description' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                            <TemplateInput
+                                value={ getVal( 'metadesc_home' ) }
+                                onChange={ ( v ) => update( 'metadesc_home', v ) }
+                                badgeGroup="homepage"
+                                maxLength={ MAX_DESC_LENGTH }
+                            />
+                        </div>
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl }
@@ -560,20 +613,46 @@ export default function Settings() {
 
                 { activeTab === 'pages' && (
                     <div className="space-y-6">
-                        <TemplateInput
-                            label={ __( 'SEO Title Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ getVal( 'title_page' ) }
-                            onChange={ ( v ) => update( 'title_page', v ) }
-                            badgeGroup="page"
-                            defaultValue="%%title%% %%separator%% %%sitename%%"
-                        />
-                        <TemplateInput
-                            label={ __( 'Default Meta Description', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ getVal( 'metadesc_page' ) }
-                            onChange={ ( v ) => update( 'metadesc_page', v ) }
-                            badgeGroup="page"
-                            maxLength={ MAX_DESC_LENGTH }
-                        />
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-700">
+                                    { __( 'SEO Title Template', 'snel-seo' ) }{ isMultilingual && ` (${ activeLang.toUpperCase() })` }
+                                </span>
+                                { isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'title_page', defaultLang ) && (
+                                    <TranslateButton
+                                        onTranslate={ handleTranslateSingle( 'title_page', 'title' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                            <TemplateInput
+                                value={ getVal( 'title_page' ) }
+                                onChange={ ( v ) => update( 'title_page', v ) }
+                                badgeGroup="page"
+                                defaultValue="%%title%% %%separator%% %%sitename%%"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-700">
+                                    { __( 'Default Meta Description', 'snel-seo' ) }{ isMultilingual && ` (${ activeLang.toUpperCase() })` }
+                                </span>
+                                { isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_page', defaultLang ) && (
+                                    <TranslateButton
+                                        onTranslate={ handleTranslateSingle( 'metadesc_page', 'description' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                            <TemplateInput
+                                value={ getVal( 'metadesc_page' ) }
+                                onChange={ ( v ) => update( 'metadesc_page', v ) }
+                                badgeGroup="page"
+                                maxLength={ MAX_DESC_LENGTH }
+                            />
+                        </div>
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_page' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl + '/example-page/' }
@@ -584,20 +663,46 @@ export default function Settings() {
 
                 { activeTab === 'posts' && (
                     <div className="space-y-6">
-                        <TemplateInput
-                            label={ __( 'SEO Title Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ getVal( 'title_post' ) }
-                            onChange={ ( v ) => update( 'title_post', v ) }
-                            badgeGroup="post"
-                            defaultValue="%%title%% %%separator%% %%sitename%%"
-                        />
-                        <TemplateInput
-                            label={ __( 'Default Meta Description', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                            value={ getVal( 'metadesc_post' ) }
-                            onChange={ ( v ) => update( 'metadesc_post', v ) }
-                            badgeGroup="post"
-                            maxLength={ MAX_DESC_LENGTH }
-                        />
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-700">
+                                    { __( 'SEO Title Template', 'snel-seo' ) }{ isMultilingual && ` (${ activeLang.toUpperCase() })` }
+                                </span>
+                                { isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'title_post', defaultLang ) && (
+                                    <TranslateButton
+                                        onTranslate={ handleTranslateSingle( 'title_post', 'title' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                            <TemplateInput
+                                value={ getVal( 'title_post' ) }
+                                onChange={ ( v ) => update( 'title_post', v ) }
+                                badgeGroup="post"
+                                defaultValue="%%title%% %%separator%% %%sitename%%"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-medium text-gray-700">
+                                    { __( 'Default Meta Description', 'snel-seo' ) }{ isMultilingual && ` (${ activeLang.toUpperCase() })` }
+                                </span>
+                                { isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_post', defaultLang ) && (
+                                    <TranslateButton
+                                        onTranslate={ handleTranslateSingle( 'metadesc_post', 'description' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                            <TemplateInput
+                                value={ getVal( 'metadesc_post' ) }
+                                onChange={ ( v ) => update( 'metadesc_post', v ) }
+                                badgeGroup="post"
+                                maxLength={ MAX_DESC_LENGTH }
+                            />
+                        </div>
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_post' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl + '/example-post/' }
