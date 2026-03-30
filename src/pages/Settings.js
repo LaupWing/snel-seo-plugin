@@ -99,7 +99,16 @@ export default function Settings() {
     const [ taglineLang, setTaglineLang ] = useState( defaultLang );
     const [ translatingTagline, setTranslatingTagline ] = useState( false );
 
-    const getTaglineVal = () => getLangValue( settings, 'site_tagline', taglineLang );
+    const wpTagline = window.snelSeo?.siteDesc || '';
+    const getTaglineVal = () => {
+        const val = getLangValue( settings, 'site_tagline', taglineLang );
+        if ( ! val && taglineLang === defaultLang && wpTagline ) return wpTagline;
+        return val;
+    };
+    const getTaglineSource = () => {
+        const val = getLangValue( settings, 'site_tagline', defaultLang );
+        return val || wpTagline;
+    };
     const updateTagline = ( value ) => {
         if ( isMultilingual ) {
             setSettings( ( prev ) => ( {
@@ -113,7 +122,7 @@ export default function Settings() {
 
     const handleTranslateTagline = async () => {
         setTranslatingTagline( true );
-        const sourceText = getLangValue( settings, 'site_tagline', defaultLang );
+        const sourceText = getTaglineSource();
         if ( ! sourceText ) { setTranslatingTagline( false ); return; }
 
         // If default lang selected → translate to all others. Otherwise → translate only the active one.
@@ -427,10 +436,11 @@ export default function Settings() {
                                                     }` }
                                                 >
                                                     { lang.label }
+                                                    { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
                                                     { ! lang.default && hasVal && (
                                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                                                     ) }
-                                                    { ! lang.default && ! hasVal && getLangValue( settings, 'site_tagline', defaultLang ) && (
+                                                    { ! lang.default && ! hasVal && getTaglineSource() && (
                                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
                                                     ) }
                                                 </button>
@@ -438,7 +448,7 @@ export default function Settings() {
                                         } ) }
                                         <button
                                             onClick={ handleTranslateTagline }
-                                            disabled={ translatingTagline || ! getLangValue( settings, 'site_tagline', defaultLang ) }
+                                            disabled={ translatingTagline || ! getTaglineSource() }
                                             className="px-2 py-0.5 text-[11px] font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded inline-flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <Languages size={ 10 } />
@@ -454,7 +464,7 @@ export default function Settings() {
                             </div>
                             <input
                                 type="text"
-                                value={ getTaglineVal() || ( taglineLang === defaultLang ? ( window.snelSeo?.siteDesc || '' ) : '' ) }
+                                value={ getTaglineVal() }
                                 onChange={ ( e ) => updateTagline( e.target.value ) }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
