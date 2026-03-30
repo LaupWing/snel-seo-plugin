@@ -24,12 +24,14 @@ add_action( 'add_meta_boxes', function () {
     }
 } );
 
+// Load classic metabox file so save_post hook is always registered.
+require_once SNEL_SEO_PLUGIN_DIR . 'inc/classic-metabox/classic-metabox.php';
+
 function snel_seo_render_metabox( $post ) {
     // If the block editor is active, render the React root. Otherwise, render classic PHP meta box.
     if ( function_exists( 'use_block_editor_for_post' ) && use_block_editor_for_post( $post ) ) {
         echo '<div id="snel-seo-metabox-root"></div>';
     } else {
-        require_once SNEL_SEO_PLUGIN_DIR . 'inc/classic-metabox/classic-metabox.php';
         snel_seo_classic_metabox_render( $post );
     }
 }
