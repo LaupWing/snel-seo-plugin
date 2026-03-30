@@ -47,6 +47,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
 
     // Multilingual settings: decode JSON strings back to objects for the frontend.
     $ml_keys = array(
+        'site_tagline'  => 'site_tagline',
         'title_home'    => 'title-home-wpseo',
         'metadesc_home' => 'metadesc-home-wpseo',
         'title_post'    => 'title-post',
@@ -61,6 +62,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'post_type_settings'   => get_option( SnelSeoConfig::$option_cpt, array() ),
     );
     $ml_defaults = array(
+        'site_tagline'  => '',
         'title_home'    => '%%sitename%% %%separator%% %%sitedesc%%',
         'metadesc_home' => '',
         'title_post'    => '%%title%% %%separator%% %%sitename%%',
@@ -178,6 +180,7 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
 
     // Keys that can be multilingual (saved as JSON string when object).
     $ml_keys = array(
+        'site_tagline'  => 'site_tagline',
         'title_home'    => 'title-home-wpseo',
         'metadesc_home' => 'metadesc-home-wpseo',
         'title_post'    => 'title-post',

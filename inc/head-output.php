@@ -64,9 +64,23 @@ function snel_seo_get_ml_setting( $settings, $key, $fallback = '' ) {
  */
 function snel_seo_get_vars() {
     $settings = get_option( SnelSeoConfig::$option_titles, array() );
+    // Resolve multilingual tagline — fall back to WP tagline if empty.
+    $tagline = get_bloginfo( 'description' );
+    if ( ! empty( $settings['site_tagline'] ) ) {
+        $raw = $settings['site_tagline'];
+        $decoded = is_string( $raw ) ? json_decode( $raw, true ) : null;
+        if ( is_array( $decoded ) ) {
+            $lang = snel_seo_get_current_lang();
+            $default_lang = snel_seo_get_default_lang();
+            $tagline = ! empty( $decoded[ $lang ] ) ? $decoded[ $lang ] : ( ! empty( $decoded[ $default_lang ] ) ? $decoded[ $default_lang ] : $tagline );
+        } elseif ( is_string( $raw ) && $raw ) {
+            $tagline = $raw;
+        }
+    }
+
     return array(
         'sitename'  => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
-        'sitedesc'  => get_bloginfo( 'description' ),
+        'sitedesc'  => $tagline,
         'separator' => snel_seo_get_separator(),
         'title'     => wp_title( '', false ),
         'category'  => single_cat_title( '', false ) ?: '',

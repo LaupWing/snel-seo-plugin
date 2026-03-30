@@ -63,6 +63,7 @@ export const MAX_DESC_LENGTH = phpConfig.maxDescLength || 160;
 
 // ── Multilingual Keys (settings that support per-language values) ────
 export const MULTILINGUAL_KEYS = [
+    'site_tagline',
     'title_home', 'metadesc_home',
     'title_page', 'metadesc_page',
     'title_post', 'metadesc_post',
