@@ -310,14 +310,7 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
     }, $result );
     $result = html_entity_decode( $result, ENT_QUOTES | ENT_HTML5, 'UTF-8' );
 
-    // For titles: assemble full title using the template so site name is never AI-translated.
-    if ( 'title' === $type && $result ) {
-        $full_title = str_replace( '%%title%%', $result, $title_template );
-        $full_title = str_replace( '%%separator%%', $separator, $full_title );
-        $full_title = str_replace( '%%sitename%%', $site_name, $full_title );
-        $full_title = str_replace( '%%sitedesc%%', get_bloginfo( 'description' ), $full_title );
-        $result     = $full_title;
-    }
+    // Title returns only the page title part — the settings template wraps it on output.
 
     return rest_ensure_response( array( 'result' => $result ) );
 }

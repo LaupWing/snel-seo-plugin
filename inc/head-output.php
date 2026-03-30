@@ -173,7 +173,8 @@ add_filter( 'pre_get_document_title', function ( $title ) {
         $default  = snel_seo_get_default_lang();
         $custom   = ! empty( $titles[ $lang ] ) ? $titles[ $lang ] : ( ! empty( $titles[ $default ] ) ? $titles[ $default ] : '' );
         if ( $custom ) {
-            return snel_seo_resolve_template( $custom, $vars );
+            // Per-page title replaces %%title%% in the template, not the whole title.
+            $vars['title'] = $custom;
         }
     }
 
@@ -184,10 +185,13 @@ add_filter( 'pre_get_document_title', function ( $title ) {
         }
     }
 
+    // Set title from post if not already overridden by per-page SEO title.
+    $has_custom_title = ! empty( $custom );
+
     if ( is_singular( 'post' ) ) {
         $template = snel_seo_get_ml_setting( $settings, 'title-post' );
         if ( $template ) {
-            $vars['title'] = get_the_title();
+            if ( ! $has_custom_title ) $vars['title'] = get_the_title();
             return snel_seo_resolve_template( $template, $vars );
         }
     }
@@ -195,7 +199,7 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     if ( is_page() ) {
         $template = snel_seo_get_ml_setting( $settings, 'title-page' );
         if ( $template ) {
-            $vars['title'] = get_the_title();
+            if ( ! $has_custom_title ) $vars['title'] = get_the_title();
             return snel_seo_resolve_template( $template, $vars );
         }
     }
@@ -207,9 +211,12 @@ add_filter( 'pre_get_document_title', function ( $title ) {
             $cpt_config = snel_seo_get_cpt_config( $post_type );
             $template   = snel_seo_get_cpt_template( $cpt_config, 'title_template' );
             if ( $template ) {
-                $vars['title'] = get_the_title();
+                if ( ! $has_custom_title ) $vars['title'] = get_the_title();
                 return snel_seo_resolve_template( $template, $vars );
             }
+            // Default template for CPTs that have no custom template set.
+            if ( ! $has_custom_title ) $vars['title'] = get_the_title();
+            return snel_seo_resolve_template( '%%title%% %%separator%% %%sitename%%', $vars );
         }
     }
 
