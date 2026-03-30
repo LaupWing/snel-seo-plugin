@@ -162,6 +162,42 @@ Each schema type is defined in `src/schema-types/{type}.js`. Fields have an `inp
 - Sitemap dynamically discovers all public CPTs via `get_post_types()` and creates `include_{cpt}` toggles
 - Default language uses `snel_seo_get_default_lang()` everywhere, never hardcoded 'nl'
 
+## AI Translation — Tag-Safe System
+
+**Critical:** SEO fields (titles, descriptions, tagline) can contain `%%template_tags%%` mixed with free text. When translating via AI, tags must NEVER be translated, removed, or reordered.
+
+### How it works
+
+The core helper is `snel_seo_translate_text()` in `inc/translate.php`. It uses a 4-step process:
+
+1. **Extract** — `snel_seo_extract_tags($text)` finds all `%%tags%%`, replaces them with `[1]`, `[2]`, etc.
+2. **Check** — if no human-readable text remains (only tags), return original string unchanged.
+3. **Translate** — send cleaned text with `[1]`, `[2]` placeholders to OpenAI. The AI is instructed to keep placeholders intact.
+4. **Restore** — `snel_seo_restore_tags($translated, $tags)` swaps `[1]`, `[2]` back to original `%%tags%%`.
+
+### Where translation happens
+
+| Endpoint / Function | File | Used by |
+|---------------------|------|---------|
+| `snel_seo_translate_text()` | `inc/translate.php` | Core helper — used by all endpoints below |
+| `/settings/translate` | `inc/admin.php` | Settings page: Homepage, Pages, Posts tab templates + tagline |
+| `/generate/{id}` | `inc/rest-api.php` | Gutenberg + Classic metabox: per-page title/description generation |
+
+### Important rules
+
+- **Never send site name to AI for translation.** For title generation, the AI generates only the page title part. The template (`%%title%% %%separator%% %%sitename%%`) is assembled programmatically in PHP.
+- **The translated string is saved as one complete string** including tags (e.g. `"Best %%title%% services %%separator%% %%sitename%%"`). Tags are only split temporarily during translation.
+- **`snel_seo_extract_tags()` and `snel_seo_restore_tags()`** are exposed separately for unit testing without hitting OpenAI.
+
+### Testing
+
+Tests are in `tests/unit/TranslateTagsTest.php`. Run with:
+```bash
+composer test
+```
+
+Tests cover: tag extraction, restoration, round-trips, edge cases (empty strings, tags-only, plain text, underscored tags, reordered tags).
+
 ## Rules
 
 - Build outputs go in `build/` (gitignored). Never commit build files.
