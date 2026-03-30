@@ -4,7 +4,7 @@ import { __ } from '@wordpress/i18n';
 import { RotateCcw } from 'lucide-react';
 import { TEMPLATE_BADGES } from '../config';
 
-export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action, placeholder, showReset: showResetProp } ) {
+export default function TemplateInput( { label, value, onChange, badgeGroup, maxLength, defaultValue, action, placeholder, showReset: showResetProp, hint } ) {
     const inputRef = useRef( null );
     const badges = badgeGroup ? ( TEMPLATE_BADGES[ badgeGroup ] || [] ) : [];
 
@@ -55,6 +55,9 @@ export default function TemplateInput( { label, value, onChange, badgeGroup, max
                     </button>
                 ) }
             </div>
+            { hint && (
+                <p className="text-[11px] text-gray-400 mb-1.5">{ hint }</p>
+            ) }
             <InputTag
                 ref={ inputRef }
                 type={ isTextarea ? undefined : 'text' }
