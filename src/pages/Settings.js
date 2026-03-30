@@ -98,6 +98,7 @@ export default function Settings() {
     // Tagline inline language state
     const [ taglineLang, setTaglineLang ] = useState( defaultLang );
     const [ translatingTagline, setTranslatingTagline ] = useState( false );
+    const [ taglineBtnText, setTaglineBtnText ] = useState( null );
 
     const wpTagline = window.snelSeo?.siteDesc || '';
     const getTaglineVal = () => {
@@ -131,6 +132,8 @@ export default function Settings() {
             : [ { code: taglineLang } ];
 
         for ( const lang of targetLangs ) {
+            setTaglineBtnText( `✦ ${ lang.label }...` );
+
             try {
                 const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
                     method: 'POST',
@@ -145,13 +148,21 @@ export default function Settings() {
                     } ) );
                 } else if ( data.code || data.message ) {
                     setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
-                    break;
+                    setTaglineBtnText( null );
+                    setTranslatingTagline( false );
+                    return;
                 }
             } catch {
                 setNotice( { type: 'error', message: __( 'Network error during translation.', 'snel-seo' ) } );
-                break;
+                setTaglineBtnText( null );
+                setTranslatingTagline( false );
+                return;
             }
         }
+
+        setTaglineBtnText( '✓ Done' );
+        await new Promise( ( r ) => setTimeout( r, 1200 ) );
+        setTaglineBtnText( null );
         setTranslatingTagline( false );
     };
 
@@ -449,15 +460,21 @@ export default function Settings() {
                                         <button
                                             onClick={ handleTranslateTagline }
                                             disabled={ translatingTagline || ! getTaglineSource() }
-                                            className="px-2 py-0.5 text-[11px] font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded inline-flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="min-w-[90px] px-2 py-0.5 text-[11px] font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
                                         >
-                                            <Languages size={ 10 } />
-                                            { translatingTagline
-                                                ? __( 'Translating...', 'snel-seo' )
-                                                : taglineLang === defaultLang
-                                                    ? __( 'Translate All', 'snel-seo' )
-                                                    : __( 'Translate', 'snel-seo' )
-                                            }
+                                            { taglineBtnText ? (
+                                                <span className={ taglineBtnText.includes( '...' ) ? 'animate-pulse' : '' }>
+                                                    { taglineBtnText }
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <Languages size={ 10 } />
+                                                    { taglineLang === defaultLang
+                                                        ? __( 'Translate All', 'snel-seo' )
+                                                        : __( 'Translate', 'snel-seo' )
+                                                    }
+                                                </>
+                                            ) }
                                         </button>
                                     </div>
                                 ) }
