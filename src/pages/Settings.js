@@ -691,6 +691,7 @@ export default function Settings() {
                         activeLang={ activeLang }
                         setActiveLang={ setActiveLang }
                         previewVars={ previewVars }
+                        setNotice={ setNotice }
                     />
                 ) }
             </div>
@@ -701,7 +702,7 @@ export default function Settings() {
 /**
  * Post Types tab — configure SEO templates and description fallback meta keys per custom post type.
  */
-function PostTypesTab( { settings, setSettings, isMultilingual, languages, defaultLang, activeLang, setActiveLang, previewVars } ) {
+function PostTypesTab( { settings, setSettings, isMultilingual, languages, defaultLang, activeLang, setActiveLang, previewVars, setNotice } ) {
     const postTypes = window.snelSeo?.postTypes || [];
 
     const [ activeCpt, setActiveCpt ] = useState( postTypes[0]?.name || '' );
@@ -782,6 +783,75 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
         }
     };
 
+    // Single-field translate for CPT templates.
+    const handleCptTranslateSingle = ( key, type ) => async ( { animateText } ) => {
+        const val = config[ key ];
+        const sourceText = ( typeof val === 'object' && val !== null ) ? ( val[ defaultLang ] || '' ) : ( val || '' );
+        if ( ! sourceText ) return;
+
+        await animateText( `✦ Translating ${ activeLang.toUpperCase() }...` );
+
+        const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+            body: JSON.stringify( { text: sourceText, lang: activeLang, type } ),
+        } );
+        const data = await res.json();
+        if ( data.result ) {
+            updateCptVal( key, data.result );
+            await animateText( '✓ Done' );
+            await new Promise( ( r ) => setTimeout( r, 1000 ) );
+        } else if ( data.code || data.message ) {
+            setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+        }
+    };
+
+    // Translate All for CPT — translates both title and description templates.
+    const handleCptTranslateAll = async ( { animateText } ) => {
+        const keys = [ [ 'title_template', 'title' ], [ 'metadesc_template', 'description' ] ];
+        const targetLangs = activeLang === defaultLang
+            ? languages.filter( ( l ) => l.code !== defaultLang )
+            : [ { code: activeLang } ];
+
+        for ( const lang of targetLangs ) {
+            for ( const [ key, type ] of keys ) {
+                const val = config[ key ];
+                const sourceText = ( typeof val === 'object' && val !== null ) ? ( val[ defaultLang ] || '' ) : ( val || '' );
+                if ( ! sourceText ) continue;
+
+                await animateText( `✦ ${ lang.code.toUpperCase() } ${ type }...` );
+
+                const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                    body: JSON.stringify( { text: sourceText, lang: lang.code, type } ),
+                } );
+                const data = await res.json();
+                if ( data.result ) {
+                    const current = config[ key ];
+                    const obj = ( typeof current === 'object' && current !== null ) ? { ...current } : {};
+                    obj[ lang.code ] = data.result;
+                    updateCptConfig( activeCpt, key, obj );
+                } else if ( data.code || data.message ) {
+                    setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+                    return;
+                }
+            }
+
+            await animateText( `${ lang.code.toUpperCase() } ✓` );
+            await new Promise( ( r ) => setTimeout( r, 500 ) );
+        }
+
+        await animateText( 'All done ✓' );
+        await new Promise( ( r ) => setTimeout( r, 1200 ) );
+    };
+
+    // Check if there's content to translate for the CPT.
+    const hasCptSource = [ 'title_template', 'metadesc_template' ].some( ( key ) => {
+        const val = config[ key ];
+        return ( typeof val === 'object' && val !== null ) ? !! val[ defaultLang ] : !! val;
+    } );
+
     if ( ! postTypes.length ) {
         return (
             <div className="text-center py-12 text-gray-400">
@@ -817,22 +887,33 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
 
             {/* Main content */ }
             <div className="flex-1 space-y-6">
-                {/* Language switcher */ }
+                {/* Language switcher + Translate All */ }
                 { isMultilingual && (
-                    <div className="flex items-center gap-1">
-                        { languages.map( ( lang ) => (
-                            <button
-                                key={ lang.code }
-                                onClick={ () => setActiveLang( lang.code ) }
-                                className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                    ? 'bg-blue-600 text-white'
-                                    : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                }` }
-                            >
-                                { lang.label }
-                                { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
-                            </button>
-                        ) ) }
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                            { languages.map( ( lang ) => (
+                                <button
+                                    key={ lang.code }
+                                    onClick={ () => setActiveLang( lang.code ) }
+                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
+                                        ? 'bg-blue-600 text-white'
+                                        : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                    }` }
+                                >
+                                    { lang.label }
+                                    { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
+                                </button>
+                            ) ) }
+                        </div>
+                        { hasCptSource && (
+                            <TranslateButton
+                                onTranslate={ handleCptTranslateAll }
+                                label={ activeLang === defaultLang
+                                    ? __( 'Translate All', 'snel-seo' )
+                                    : `${ __( 'Translate All for', 'snel-seo' ) } ${ activeLang.toUpperCase() }` }
+                                size="sm"
+                            />
+                        ) }
                     </div>
                 ) }
 
@@ -843,6 +924,17 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     onChange={ ( v ) => updateCptVal( 'title_template', v ) }
                     badgeGroup="page"
                     defaultValue="%%title%% %%separator%% %%sitename%%"
+                    showReset={ activeLang === defaultLang }
+                    action={ isMultilingual && activeLang !== defaultLang && ( () => {
+                        const val = config.title_template;
+                        return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
+                            <TranslateButton
+                                onTranslate={ handleCptTranslateSingle( 'title_template', 'title' ) }
+                                label={ __( 'Translate', 'snel-seo' ) }
+                                size="sm"
+                            />
+                        ) : null;
+                    } )() }
                 />
 
                 {/* Meta description template */ }
@@ -852,6 +944,17 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     onChange={ ( v ) => updateCptVal( 'metadesc_template', v ) }
                     badgeGroup="page"
                     maxLength={ MAX_DESC_LENGTH }
+                    showReset={ activeLang === defaultLang }
+                    action={ isMultilingual && activeLang !== defaultLang && ( () => {
+                        const val = config.metadesc_template;
+                        return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
+                            <TranslateButton
+                                onTranslate={ handleCptTranslateSingle( 'metadesc_template', 'description' ) }
+                                label={ __( 'Translate', 'snel-seo' ) }
+                                size="sm"
+                            />
+                        ) : null;
+                    } )() }
                 />
 
                 {/* Google Preview */ }
