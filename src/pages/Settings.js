@@ -116,8 +116,12 @@ export default function Settings() {
         const sourceText = getLangValue( settings, 'site_tagline', defaultLang );
         if ( ! sourceText ) { setTranslatingTagline( false ); return; }
 
-        const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
-        for ( const lang of otherLangs ) {
+        // If default lang selected → translate to all others. Otherwise → translate only the active one.
+        const targetLangs = taglineLang === defaultLang
+            ? languages.filter( ( l ) => l.code !== defaultLang )
+            : [ { code: taglineLang } ];
+
+        for ( const lang of targetLangs ) {
             try {
                 const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
                     method: 'POST',
@@ -438,7 +442,12 @@ export default function Settings() {
                                             className="px-2 py-0.5 text-[11px] font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded inline-flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <Languages size={ 10 } />
-                                            { translatingTagline ? __( 'Translating...', 'snel-seo' ) : __( 'Translate', 'snel-seo' ) }
+                                            { translatingTagline
+                                                ? __( 'Translating...', 'snel-seo' )
+                                                : taglineLang === defaultLang
+                                                    ? __( 'Translate All', 'snel-seo' )
+                                                    : __( 'Translate', 'snel-seo' )
+                                            }
                                         </button>
                                     </div>
                                 ) }
