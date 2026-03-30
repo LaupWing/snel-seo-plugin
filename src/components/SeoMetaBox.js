@@ -127,12 +127,14 @@ export default function SeoMetaBox() {
         } );
     };
 
-    // Translate All — generate title + description for all non-default languages
+    // Translate All — generate title + description for target languages
     const handleTranslateAll = async () => {
         if ( ! postId ) return;
         setTranslatingAll( true );
 
-        const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
+        const otherLangs = activeLang === defaultLang
+            ? languages.filter( ( l ) => l.code !== defaultLang )
+            : [ { code: activeLang, label: activeLang.toUpperCase() } ];
 
         for ( const lang of otherLangs ) {
             const hasTitle = !! seoTitle[ defaultLang ] || !! seoTitle[ lang.code ];
@@ -244,7 +246,7 @@ export default function SeoMetaBox() {
         : { label: __( 'Not set', 'snel-seo' ), className: 'bg-amber-100 text-amber-600' };
 
     const defaultLangLabel = languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase();
-    const hasDefaultContent = seoTitle[ defaultLang ] || metaDesc[ defaultLang ];
+    const hasDefaultContent = seoTitle[ defaultLang ] || metaDesc[ defaultLang ] || postTitle;
     const hasAnyTranslations = languages.some( ( l ) => l.code !== defaultLang && ( seoTitle[ l.code ] || metaDesc[ l.code ] ) );
     const translateTooltip = ! hasDefaultContent
         ? `Fill in SEO title and meta description in ${ defaultLangLabel } (default language) first to enable translation.`
@@ -302,9 +304,11 @@ export default function SeoMetaBox() {
                                     ) : (
                                         <span className="inline-flex items-center gap-1.5">
                                             <Languages size={ 12 } />
-                                            { missingCount > 0
-                                                ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
-                                                : __( 'Re-translate All', 'snel-seo' )
+                                            { activeLang === defaultLang
+                                                ? ( missingCount > 0
+                                                    ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
+                                                    : __( 'Re-translate All', 'snel-seo' ) )
+                                                : `${ __( 'Translate All for', 'snel-seo' ) } ${ activeLang.toUpperCase() }`
                                             }
                                         </span>
                                     ) }
