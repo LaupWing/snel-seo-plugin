@@ -302,8 +302,7 @@ export default function Settings() {
                             );
                         } ) }
                     </div>
-                    { activeLang !== defaultLang && (
-                        <Tooltip
+                    <Tooltip
                             text={ ! hasDefaultContent
                                 ? `Fill in content in ${ languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase() } (default) first.`
                                 : missingCount > 0
@@ -335,7 +334,6 @@ export default function Settings() {
                                 </button>
                             </span>
                         </Tooltip>
-                    ) }
                 </div>
             ) }
 
