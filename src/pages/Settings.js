@@ -354,7 +354,7 @@ export default function Settings() {
                 </div>
             ) }
 
-            <Tabs tabs={ TABS } active={ activeTab } onChange={ setActiveTab } />
+            <Tabs tabs={ TABS } active={ activeTab } onChange={ ( tab ) => { setActiveTab( tab ); setActiveLang( defaultLang ); } } />
 
             {/* Language switcher — for Homepage, Pages, Posts tabs */ }
             { isMultilingual && [ 'homepage', 'pages', 'posts' ].includes( activeTab ) && (
