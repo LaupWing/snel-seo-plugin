@@ -570,6 +570,7 @@ export default function Settings() {
                             badgeGroup="homepage"
                             defaultValue="%%sitename%% %%separator%% %%sitedesc%%"
                             showReset={ activeLang === defaultLang }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'title_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }</strong></> }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'title_home', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'title_home', 'title' ) }
@@ -585,6 +586,7 @@ export default function Settings() {
                             badgeGroup="homepage"
                             maxLength={ MAX_DESC_LENGTH }
                             showReset={ activeLang === defaultLang }
+                            hint={ getVal( 'metadesc_home' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_home' ), previewVars ) }</strong></> : null }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_home', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'metadesc_home', 'description' ) }
@@ -610,6 +612,7 @@ export default function Settings() {
                             badgeGroup="page"
                             defaultValue="%%title%% %%separator%% %%sitename%%"
                             showReset={ activeLang === defaultLang }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'title_page' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }</strong></> }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'title_page', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'title_page', 'title' ) }
@@ -625,6 +628,7 @@ export default function Settings() {
                             badgeGroup="page"
                             maxLength={ MAX_DESC_LENGTH }
                             showReset={ activeLang === defaultLang }
+                            hint={ getVal( 'metadesc_page' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_page' ), previewVars ) }</strong></> : null }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_page', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'metadesc_page', 'description' ) }
@@ -650,6 +654,7 @@ export default function Settings() {
                             badgeGroup="post"
                             defaultValue="%%title%% %%separator%% %%sitename%%"
                             showReset={ activeLang === defaultLang }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'title_post' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }</strong></> }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'title_post', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'title_post', 'title' ) }
@@ -665,6 +670,7 @@ export default function Settings() {
                             badgeGroup="post"
                             maxLength={ MAX_DESC_LENGTH }
                             showReset={ activeLang === defaultLang }
+                            hint={ getVal( 'metadesc_post' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_post' ), previewVars ) }</strong></> : null }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_post', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'metadesc_post', 'description' ) }
@@ -937,6 +943,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     badgeGroup="page"
                     defaultValue="%%title%% %%separator%% %%sitename%%"
                     showReset={ activeLang === defaultLang }
+                    hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getCptVal( 'title_template' ) || '%%title%% %%separator%% %%sitename%%', { ...previewVars, title: currentCpt?.label || '' } ) }</strong></> }
                     action={ isMultilingual && activeLang !== defaultLang && ( () => {
                         const val = config.title_template;
                         return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
@@ -957,6 +964,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     badgeGroup="page"
                     maxLength={ MAX_DESC_LENGTH }
                     showReset={ activeLang === defaultLang }
+                    hint={ getCptVal( 'metadesc_template' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getCptVal( 'metadesc_template' ), { ...previewVars, title: currentCpt?.label || '' } ) }</strong></> : null }
                     action={ isMultilingual && activeLang !== defaultLang && ( () => {
                         const val = config.metadesc_template;
                         return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
