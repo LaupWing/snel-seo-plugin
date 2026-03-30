@@ -46,15 +46,15 @@ export default function TranslateButton( { onTranslate, disabled, label, classNa
     };
 
     const sizeClasses = size === 'sm'
-        ? 'min-w-[90px] px-2 py-0.5 text-[11px]'
-        : 'min-w-[140px] h-[28px] px-3 py-1 text-xs';
+        ? 'min-w-[90px] px-2 py-0.5 text-[11px] rounded'
+        : 'min-w-[140px] h-[28px] px-3 py-1 text-xs rounded-full';
 
     return (
         <button
             type="button"
             onClick={ handleClick }
             disabled={ disabled || running }
-            className={ `font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-full overflow-hidden inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${ sizeClasses } ${ className }` }
+            className={ `font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 overflow-hidden inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${ sizeClasses } ${ className }` }
         >
             { btnText ? (
                 <span className={ `inline-block ${ btnText.includes( '...' ) ? 'animate-pulse' : '' }` } style={ btnAnimStyle }>
