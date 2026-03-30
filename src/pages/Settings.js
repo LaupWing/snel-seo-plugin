@@ -7,6 +7,7 @@ import TemplateInput from '../components/TemplateInput';
 import GooglePreview from '../components/GooglePreview';
 import Tabs from '../components/Tabs';
 import { SEPARATORS, getSeparatorChar, DEFAULT_TEMPLATES, MULTILINGUAL_KEYS, MAX_DESC_LENGTH } from '../config';
+import TranslateButton from '../components/TranslateButton';
 
 function resolveTemplate( template, vars ) {
     let result = template;
@@ -97,8 +98,6 @@ export default function Settings() {
 
     // Tagline inline language state
     const [ taglineLang, setTaglineLang ] = useState( defaultLang );
-    const [ translatingTagline, setTranslatingTagline ] = useState( false );
-    const [ taglineBtnText, setTaglineBtnText ] = useState( null );
 
     const wpTagline = window.snelSeo?.siteDesc || '';
     const getTaglineVal = () => {
@@ -121,49 +120,39 @@ export default function Settings() {
         }
     };
 
-    const handleTranslateTagline = async () => {
-        setTranslatingTagline( true );
+    const handleTranslateTagline = async ( { animateText } ) => {
         const sourceText = getTaglineSource();
-        if ( ! sourceText ) { setTranslatingTagline( false ); return; }
+        if ( ! sourceText ) return;
 
-        // If default lang selected → translate to all others. Otherwise → translate only the active one.
         const targetLangs = taglineLang === defaultLang
             ? languages.filter( ( l ) => l.code !== defaultLang )
             : [ { code: taglineLang } ];
 
         for ( const lang of targetLangs ) {
-            setTaglineBtnText( `✦ ${ lang.label }...` );
+            await animateText( `✦ Translating ${ lang.label }...` );
 
-            try {
-                const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
-                    body: JSON.stringify( { text: sourceText, lang: lang.code, type: 'title' } ),
-                } );
-                const data = await res.json();
-                if ( data.result ) {
-                    setSettings( ( prev ) => ( {
-                        ...prev,
-                        site_tagline: setLangValue( prev, 'site_tagline', lang.code, data.result ),
-                    } ) );
-                } else if ( data.code || data.message ) {
-                    setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
-                    setTaglineBtnText( null );
-                    setTranslatingTagline( false );
-                    return;
-                }
-            } catch {
-                setNotice( { type: 'error', message: __( 'Network error during translation.', 'snel-seo' ) } );
-                setTaglineBtnText( null );
-                setTranslatingTagline( false );
+            const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                body: JSON.stringify( { text: sourceText, lang: lang.code, type: 'title' } ),
+            } );
+            const data = await res.json();
+            if ( data.result ) {
+                setSettings( ( prev ) => ( {
+                    ...prev,
+                    site_tagline: setLangValue( prev, 'site_tagline', lang.code, data.result ),
+                } ) );
+            } else if ( data.code || data.message ) {
+                setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
                 return;
             }
+
+            await animateText( `${ lang.label } ✓` );
+            await new Promise( ( r ) => setTimeout( r, 500 ) );
         }
 
-        setTaglineBtnText( '✓ Done' );
+        await animateText( 'All done ✓' );
         await new Promise( ( r ) => setTimeout( r, 1200 ) );
-        setTaglineBtnText( null );
-        setTranslatingTagline( false );
     };
 
     const update = ( key, value ) => {
@@ -457,25 +446,12 @@ export default function Settings() {
                                                 </button>
                                             );
                                         } ) }
-                                        <button
-                                            onClick={ handleTranslateTagline }
-                                            disabled={ translatingTagline || ! getTaglineSource() }
-                                            className="min-w-[90px] px-2 py-0.5 text-[11px] font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded inline-flex items-center justify-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden"
-                                        >
-                                            { taglineBtnText ? (
-                                                <span className={ taglineBtnText.includes( '...' ) ? 'animate-pulse' : '' }>
-                                                    { taglineBtnText }
-                                                </span>
-                                            ) : (
-                                                <>
-                                                    <Languages size={ 10 } />
-                                                    { taglineLang === defaultLang
-                                                        ? __( 'Translate All', 'snel-seo' )
-                                                        : __( 'Translate', 'snel-seo' )
-                                                    }
-                                                </>
-                                            ) }
-                                        </button>
+                                        <TranslateButton
+                                            onTranslate={ handleTranslateTagline }
+                                            disabled={ ! getTaglineSource() }
+                                            label={ taglineLang === defaultLang ? __( 'Translate All', 'snel-seo' ) : __( 'Translate', 'snel-seo' ) }
+                                            size="sm"
+                                        />
                                     </div>
                                 ) }
                             </div>
