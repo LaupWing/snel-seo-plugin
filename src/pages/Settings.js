@@ -925,6 +925,9 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                                         { ! lang.default && ( hasTitle || hasDesc ) && ! ( hasTitle && hasDesc ) && (
                                             <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
                                         ) }
+                                        { ! lang.default && ! hasTitle && ! hasDesc && (
+                                            <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                                        ) }
                                     </button>
                                 );
                             } ) }
@@ -947,6 +950,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     value={ getCptVal( 'title_template' ) }
                     onChange={ ( v ) => updateCptVal( 'title_template', v ) }
                     badgeGroup="page"
+                    placeholder="%%title%% %%separator%% %%sitename%%"
                     defaultValue="%%title%% %%separator%% %%sitename%%"
                     showReset={ activeLang === defaultLang }
                     hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getCptVal( 'title_template' ) || '%%title%% %%separator%% %%sitename%%', { ...previewVars, title: currentCpt?.label || '' } ) }</strong></> }
