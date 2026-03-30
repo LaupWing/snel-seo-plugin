@@ -262,7 +262,6 @@ function snel_seo_generate_meta( WP_REST_Request $request ) {
 
     if ( 'title' === $type ) {
         $prompt = "Generate an SEO-optimized page title in {$lang_name} for the following page. "
-                . "Generate ONLY the page title text — do NOT include a site name, separator, or brand name. "
                 . "Keep it under {$max_title_part} characters. "
                 . "Write in {$lang_name}. Return ONLY the page title, nothing else.\n\n"
                 . "Page title: {$title}\nPage content: {$content}";
