@@ -59,6 +59,7 @@ add_action( 'enqueue_block_editor_assets', function () {
         'languages'    => $languages,
         'defaultLang'  => snel_seo_get_default_lang(),
         'multilingual' => snel_seo_is_multilingual(),
+        'settingsUrl'  => admin_url( 'admin.php?page=snel-seo' ),
         'settings'     => array(
             'website_name'     => isset( $settings['website_name'] ) ? $settings['website_name'] : get_bloginfo( 'name' ),
             'separator'        => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
