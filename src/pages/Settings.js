@@ -139,6 +139,7 @@ export default function Settings() {
 
         // Determine which tab's keys to translate
         const tabKeys = {
+            general: [ 'site_tagline' ],
             homepage: [ 'title_home', 'metadesc_home' ],
             pages: [ 'title_page', 'metadesc_page' ],
             posts: [ 'title_post', 'metadesc_post' ],
@@ -193,6 +194,7 @@ export default function Settings() {
 
     // Count missing translations for current tab
     const tabKeys = {
+        general: [ 'site_tagline' ],
         homepage: [ 'title_home', 'metadesc_home' ],
         pages: [ 'title_page', 'metadesc_page' ],
         posts: [ 'title_post', 'metadesc_post' ],
@@ -270,8 +272,8 @@ export default function Settings() {
 
             <Tabs tabs={ TABS } active={ activeTab } onChange={ setActiveTab } />
 
-            {/* Language switcher — for Homepage, Pages, Posts tabs */ }
-            { isMultilingual && [ 'homepage', 'pages', 'posts' ].includes( activeTab ) && (
+            {/* Language switcher — for tabs with multilingual content */ }
+            { isMultilingual && [ 'general', 'homepage', 'pages', 'posts' ].includes( activeTab ) && (
                 <div className="flex items-center justify-between px-6 py-3 bg-white border border-gray-200 border-b-0 rounded-t-lg">
                     <div className="flex items-center gap-1">
                         { languages.map( ( lang ) => {
@@ -338,7 +340,7 @@ export default function Settings() {
             ) }
 
             {/* Tab content */ }
-            <div className={ `bg-white border border-gray-200 p-6 ${ isMultilingual && [ 'homepage', 'pages', 'posts' ].includes( activeTab ) ? 'rounded-b-lg' : 'rounded-lg' }` }>
+            <div className={ `bg-white border border-gray-200 p-6 ${ isMultilingual && [ 'general', 'homepage', 'pages', 'posts' ].includes( activeTab ) ? 'rounded-b-lg' : 'rounded-lg' }` }>
                 { activeTab === 'general' && (
                     <div className="space-y-6">
                         <div>
@@ -360,23 +362,6 @@ export default function Settings() {
                                 { __( 'Site Tagline', 'snel-seo' ) }
                                 { isMultilingual && ` (${ activeLang.toUpperCase() })` }
                             </label>
-                            { isMultilingual && (
-                                <div className="flex items-center gap-1 mb-2">
-                                    { languages.map( ( lang ) => (
-                                        <button
-                                            key={ lang.code }
-                                            onClick={ () => setActiveLang( lang.code ) }
-                                            className={ `px-2 py-0.5 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                                ? 'bg-blue-600 text-white'
-                                                : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                            }` }
-                                        >
-                                            { lang.label }
-                                            { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
-                                        </button>
-                                    ) ) }
-                                </div>
-                            ) }
                             <input
                                 type="text"
                                 value={ getVal( 'site_tagline' ) }
