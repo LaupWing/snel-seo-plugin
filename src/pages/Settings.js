@@ -81,16 +81,7 @@ export default function Settings() {
                 // Ensure default lang has a value
                 if ( ! obj[ defaultLang ] && defaults[ key ] ) {
                     obj[ defaultLang ] = defaults[ key ];
-                }
-                // Fill other languages with default lang value
-                const source = obj[ defaultLang ] || defaults[ key ];
-                if ( source ) {
-                    for ( const lang of languages ) {
-                        if ( ! obj[ lang.code ] ) {
-                            obj[ lang.code ] = source;
-                            changed = true;
-                        }
-                    }
+                    changed = true;
                 }
                 next[ key ] = obj;
             }
