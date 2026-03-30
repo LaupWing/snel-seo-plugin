@@ -891,19 +891,31 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                 { isMultilingual && (
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
-                            { languages.map( ( lang ) => (
-                                <button
-                                    key={ lang.code }
-                                    onClick={ () => setActiveLang( lang.code ) }
-                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                        ? 'bg-blue-600 text-white'
-                                        : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                    }` }
-                                >
-                                    { lang.label }
-                                    { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
-                                </button>
-                            ) ) }
+                            { languages.map( ( lang ) => {
+                                const titleVal = config.title_template;
+                                const descVal = config.metadesc_template;
+                                const hasTitle = !! ( typeof titleVal === 'object' ? titleVal[ lang.code ] : ( lang.default ? titleVal : '' ) );
+                                const hasDesc = !! ( typeof descVal === 'object' ? descVal[ lang.code ] : ( lang.default ? descVal : '' ) );
+                                return (
+                                    <button
+                                        key={ lang.code }
+                                        onClick={ () => setActiveLang( lang.code ) }
+                                        className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
+                                            ? 'bg-blue-600 text-white'
+                                            : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        }` }
+                                    >
+                                        { lang.label }
+                                        { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
+                                        { ! lang.default && hasTitle && hasDesc && (
+                                            <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
+                                        ) }
+                                        { ! lang.default && ( hasTitle || hasDesc ) && ! ( hasTitle && hasDesc ) && (
+                                            <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
+                                        ) }
+                                    </button>
+                                );
+                            } ) }
                         </div>
                         { hasCptSource && (
                             <TranslateButton
