@@ -135,11 +135,10 @@ export default function SeoMetaBox() {
         const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
 
         for ( const lang of otherLangs ) {
-            const needsTitle = !! seoTitle[ defaultLang ] || !! seoTitle[ lang.code ];
-            const needsDesc = !! metaDesc[ defaultLang ] || !! metaDesc[ lang.code ];
+            const hasTitle = !! seoTitle[ defaultLang ] || !! seoTitle[ lang.code ];
+            const needsTitle = hasTitle || !! postTitle;
+            const needsDesc = !! metaDesc[ defaultLang ] || !! metaDesc[ lang.code ] || !! postTitle;
             const needsKw = !! focusKw[ defaultLang ];
-
-            if ( ! needsTitle && ! needsDesc && ! needsKw ) continue;
 
             await animateBtnText( `✦ Translating ${ lang.label }...` );
 
