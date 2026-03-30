@@ -82,15 +82,10 @@ function snel_seo_classic_metabox_render( $post ) {
     if ( ! is_array( $seo_titles ) ) $seo_titles = array();
     if ( ! is_array( $seo_descs ) ) $seo_descs = array();
 
-    // Pre-fill from product data if SEO fields are empty.
+    // Pre-fill description from fallback fields if SEO fields are empty.
+    // Title is NOT pre-filled — the template wraps %%title%% at render time.
     foreach ( $languages as $lang ) {
         $code = $lang['code'];
-        if ( empty( $seo_titles[ $code ] ) ) {
-            $fallback_title = snel_seo_classic_get_fallback_title( $post, $code, $default_lang );
-            if ( $fallback_title ) {
-                $seo_titles[ $code ] = $fallback_title . ' ' . $separator . ' ' . $site_name;
-            }
-        }
         if ( empty( $seo_descs[ $code ] ) ) {
             $seo_descs[ $code ] = snel_seo_classic_get_fallback_desc( $post->ID, $code, $default_lang );
         }
@@ -116,6 +111,7 @@ function snel_seo_classic_metabox_render( $post ) {
         .snel-seo-classic .snel-seo-lang-btn .snel-seo-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
         .snel-seo-classic .snel-seo-dot-green { background: #00a32a; }
         .snel-seo-classic .snel-seo-dot-amber { background: #dba617; }
+        .snel-seo-classic .snel-seo-dot-gray { background: #c3c4c7; }
         .snel-seo-classic .snel-seo-translate-all { margin-left: 12px; color: #6b21a8; border-color: #d8b4fe; background: #faf5ff; }
         .snel-seo-classic .snel-seo-translate-all:hover { background: #f3e8ff; }
         .snel-seo-classic .snel-seo-field { margin-bottom: 14px; }
@@ -153,6 +149,7 @@ function snel_seo_classic_metabox_render( $post ) {
                 if ( ! $lang['default'] ) {
                     if ( $has_title && $has_desc ) $dot_class = 'snel-seo-dot-green';
                     elseif ( $has_title || $has_desc ) $dot_class = 'snel-seo-dot-amber';
+                    else $dot_class = 'snel-seo-dot-gray';
                 }
             ?>
                 <button type="button"
@@ -169,7 +166,7 @@ function snel_seo_classic_metabox_render( $post ) {
             <?php endforeach; ?>
 
             <button type="button" class="button snel-seo-translate-all" id="snel-seo-translate-all-btn">
-                &#10022; <?php esc_html_e( 'Translate All', 'snel-seo' ); ?>
+                &#10022; <span id="snel-seo-translate-all-label"><?php esc_html_e( 'Translate All', 'snel-seo' ); ?></span>
             </button>
             <span class="snel-seo-translate-status" id="snel-seo-translate-status"></span>
         </div>
@@ -181,7 +178,7 @@ function snel_seo_classic_metabox_render( $post ) {
             $desc  = isset( $seo_descs[ $code ] ) ? $seo_descs[ $code ] : '';
             $is_active = ( $code === $default_lang );
 
-            $preview_title = $title ?: $post->post_title . ' ' . $separator . ' ' . $site_name;
+            $preview_title = ( $title ?: $post->post_title ) . ' ' . $separator . ' ' . $site_name;
             $preview_desc  = $desc ?: '';
 
             $url_parts = explode( '/', trim( wp_parse_url( $permalink, PHP_URL_PATH ) ?: '', '/' ) );
@@ -194,12 +191,16 @@ function snel_seo_classic_metabox_render( $post ) {
                     <?php esc_html_e( 'SEO Title', 'snel-seo' ); ?>
                     <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
                 </label>
+                <p class="description" style="font-size:11px;color:#888;margin:2px 0 6px;">
+                    <?php esc_html_e( 'Replaces %%title%% in your title template.', 'snel-seo' ); ?>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=snel-seo' ) ); ?>" target="_blank"><?php esc_html_e( 'Change template', 'snel-seo' ); ?></a>
+                </p>
                 <input type="text"
                     name="snel_seo_title[<?php echo esc_attr( $code ); ?>]"
                     value="<?php echo esc_attr( $title ); ?>"
                     class="snel-seo-title-input large-text"
                     data-lang="<?php echo esc_attr( $code ); ?>"
-                    placeholder="<?php echo esc_attr( $post->post_title . ' ' . $separator . ' ' . $site_name ); ?>">
+                    placeholder="<?php echo esc_attr( $post->post_title ); ?>">
             </div>
 
             <div class="snel-seo-field">
@@ -207,6 +208,9 @@ function snel_seo_classic_metabox_render( $post ) {
                     <?php esc_html_e( 'Meta Description', 'snel-seo' ); ?>
                     <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
                 </label>
+                <p class="description" style="font-size:11px;color:#888;margin:2px 0 6px;">
+                    <?php esc_html_e( 'Overrides the auto-generated description for this page.', 'snel-seo' ); ?>
+                </p>
                 <textarea
                     name="snel_seo_metadesc[<?php echo esc_attr( $code ); ?>]"
                     rows="3"
@@ -279,6 +283,16 @@ function snel_seo_classic_metabox_render( $post ) {
         var langBtns = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-btn');
         var langPanels = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-panel');
 
+        function updateTranslateLabel() {
+            var label = document.getElementById('snel-seo-translate-all-label');
+            if (!label) return;
+            if (currentLang === defaultLang) {
+                label.textContent = '<?php echo esc_js( __( 'Translate All', 'snel-seo' ) ); ?>';
+            } else {
+                label.textContent = '<?php echo esc_js( __( 'Translate All for', 'snel-seo' ) ); ?> ' + currentLang.toUpperCase();
+            }
+        }
+
         langBtns.forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -294,6 +308,7 @@ function snel_seo_classic_metabox_render( $post ) {
                         p.classList.remove('active');
                     }
                 });
+                updateTranslateLabel();
             });
         });
 
@@ -325,7 +340,7 @@ function snel_seo_classic_metabox_render( $post ) {
                 var titleVal = titleInput ? titleInput.value : '';
                 var descVal = descInput ? descInput.value : '';
 
-                var displayTitle = titleVal || (postTitle + ' ' + separator + ' ' + siteName);
+                var displayTitle = (titleVal || postTitle) + ' ' + separator + ' ' + siteName;
                 var displayDesc = descVal || 'No meta description set. Google will auto-generate a snippet from your page content.';
 
                 // Google Preview
@@ -360,6 +375,8 @@ function snel_seo_classic_metabox_render( $post ) {
                     dot.classList.add('snel-seo-dot-green');
                 } else if (hasTitle || hasDesc) {
                     dot.classList.add('snel-seo-dot-amber');
+                } else {
+                    dot.classList.add('snel-seo-dot-gray');
                 }
             });
         }
@@ -377,13 +394,16 @@ function snel_seo_classic_metabox_render( $post ) {
                 var srcTitle = defaultTitle ? defaultTitle.value.trim() : '';
                 var srcDesc = defaultDesc ? defaultDesc.value.trim() : '';
 
-                if (!srcTitle && !srcDesc) {
+                if (!srcTitle && !srcDesc && !postTitle) {
                     translateStatus.textContent = 'Fill in the default language first.';
                     return;
                 }
+                if (!srcTitle) srcTitle = postTitle;
 
                 translateBtn.disabled = true;
-                var otherLangs = languages.filter(function(l) { return l !== defaultLang; });
+                var otherLangs = currentLang === defaultLang
+                    ? languages.filter(function(l) { return l !== defaultLang; })
+                    : [currentLang];
                 var idx = 0;
 
                 function translateNext() {
