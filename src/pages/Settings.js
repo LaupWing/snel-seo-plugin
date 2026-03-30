@@ -291,38 +291,40 @@ export default function Settings() {
                             );
                         } ) }
                     </div>
-                    <Tooltip
-                        text={ ! hasDefaultContent
-                            ? `Fill in content in ${ languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase() } (default) first.`
-                            : missingCount > 0
-                                ? `Translate to all other languages using AI.`
-                                : 'All languages have been translated.'
-                        }
-                        delay={ 100 }
-                    >
-                        <span className="inline-flex">
-                            <button
-                                type="button"
-                                onClick={ handleTranslateAll }
-                                disabled={ translatingAll || ! hasDefaultContent }
-                                className="min-w-[140px] h-[28px] px-3 py-1 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-full overflow-hidden inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                { btnText ? (
-                                    <span className={ `inline-block ${ btnText.includes( '...' ) ? 'animate-pulse' : '' }` } style={ btnAnimStyle }>
-                                        { btnText }
-                                    </span>
-                                ) : (
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <Languages size={ 12 } />
-                                        { missingCount > 0
-                                            ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
-                                            : __( 'Re-translate All', 'snel-seo' )
-                                        }
-                                    </span>
-                                ) }
-                            </button>
-                        </span>
-                    </Tooltip>
+                    { activeLang !== defaultLang && (
+                        <Tooltip
+                            text={ ! hasDefaultContent
+                                ? `Fill in content in ${ languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase() } (default) first.`
+                                : missingCount > 0
+                                    ? `Translate to all other languages using AI.`
+                                    : 'All languages have been translated.'
+                            }
+                            delay={ 100 }
+                        >
+                            <span className="inline-flex">
+                                <button
+                                    type="button"
+                                    onClick={ handleTranslateAll }
+                                    disabled={ translatingAll || ! hasDefaultContent }
+                                    className="min-w-[140px] h-[28px] px-3 py-1 text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded-full overflow-hidden inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    { btnText ? (
+                                        <span className={ `inline-block ${ btnText.includes( '...' ) ? 'animate-pulse' : '' }` } style={ btnAnimStyle }>
+                                            { btnText }
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1.5">
+                                            <Languages size={ 12 } />
+                                            { missingCount > 0
+                                                ? `${ __( 'Translate All', 'snel-seo' ) } (${ missingCount })`
+                                                : __( 'Re-translate All', 'snel-seo' )
+                                            }
+                                        </span>
+                                    ) }
+                                </button>
+                            </span>
+                        </Tooltip>
+                    ) }
                 </div>
             ) }
 
