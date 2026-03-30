@@ -95,6 +95,53 @@ export default function Settings() {
     const [ btnText, setBtnText ] = useState( null );
     const [ btnAnimStyle, setBtnAnimStyle ] = useState( {} );
 
+    // Tagline inline language state
+    const [ taglineLang, setTaglineLang ] = useState( defaultLang );
+    const [ translatingTagline, setTranslatingTagline ] = useState( false );
+
+    const getTaglineVal = () => getLangValue( settings, 'site_tagline', taglineLang );
+    const updateTagline = ( value ) => {
+        if ( isMultilingual ) {
+            setSettings( ( prev ) => ( {
+                ...prev,
+                site_tagline: setLangValue( prev, 'site_tagline', taglineLang, value ),
+            } ) );
+        } else {
+            setSettings( ( prev ) => ( { ...prev, site_tagline: value } ) );
+        }
+    };
+
+    const handleTranslateTagline = async () => {
+        setTranslatingTagline( true );
+        const sourceText = getLangValue( settings, 'site_tagline', defaultLang );
+        if ( ! sourceText ) { setTranslatingTagline( false ); return; }
+
+        const otherLangs = languages.filter( ( l ) => l.code !== defaultLang );
+        for ( const lang of otherLangs ) {
+            try {
+                const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                    body: JSON.stringify( { text: sourceText, lang: lang.code, type: 'title' } ),
+                } );
+                const data = await res.json();
+                if ( data.result ) {
+                    setSettings( ( prev ) => ( {
+                        ...prev,
+                        site_tagline: setLangValue( prev, 'site_tagline', lang.code, data.result ),
+                    } ) );
+                } else if ( data.code || data.message ) {
+                    setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+                    break;
+                }
+            } catch {
+                setNotice( { type: 'error', message: __( 'Network error during translation.', 'snel-seo' ) } );
+                break;
+            }
+        }
+        setTranslatingTagline( false );
+    };
+
     const update = ( key, value ) => {
         if ( MULTILINGUAL_KEYS.includes( key ) && isMultilingual ) {
             setSettings( ( prev ) => ( {
@@ -139,7 +186,6 @@ export default function Settings() {
 
         // Determine which tab's keys to translate
         const tabKeys = {
-            general: [ 'site_tagline' ],
             homepage: [ 'title_home', 'metadesc_home' ],
             pages: [ 'title_page', 'metadesc_page' ],
             posts: [ 'title_post', 'metadesc_post' ],
@@ -272,8 +318,8 @@ export default function Settings() {
 
             <Tabs tabs={ TABS } active={ activeTab } onChange={ setActiveTab } />
 
-            {/* Language switcher — for tabs with multilingual content */ }
-            { isMultilingual && [ 'general', 'homepage', 'pages', 'posts' ].includes( activeTab ) && (
+            {/* Language switcher — for Homepage, Pages, Posts tabs */ }
+            { isMultilingual && [ 'homepage', 'pages', 'posts' ].includes( activeTab ) && (
                 <div className="flex items-center justify-between px-6 py-3 bg-white border border-gray-200 border-b-0 rounded-t-lg">
                     <div className="flex items-center gap-1">
                         { languages.map( ( lang ) => {
@@ -340,7 +386,7 @@ export default function Settings() {
             ) }
 
             {/* Tab content */ }
-            <div className={ `bg-white border border-gray-200 p-6 ${ isMultilingual && [ 'general', 'homepage', 'pages', 'posts' ].includes( activeTab ) ? 'rounded-b-lg' : 'rounded-lg' }` }>
+            <div className={ `bg-white border border-gray-200 p-6 ${ isMultilingual && [ 'homepage', 'pages', 'posts' ].includes( activeTab ) ? 'rounded-b-lg' : 'rounded-lg' }` }>
                 { activeTab === 'general' && (
                     <div className="space-y-6">
                         <div>
@@ -358,14 +404,40 @@ export default function Settings() {
                             </p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                { __( 'Site Tagline', 'snel-seo' ) }
-                                { isMultilingual && ` (${ activeLang.toUpperCase() })` }
-                            </label>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="text-sm font-medium text-gray-700">
+                                    { __( 'Site Tagline', 'snel-seo' ) }
+                                    { isMultilingual && ` (${ taglineLang.toUpperCase() })` }
+                                </label>
+                                { isMultilingual && (
+                                    <div className="flex items-center gap-1.5">
+                                        { languages.map( ( lang ) => (
+                                            <button
+                                                key={ lang.code }
+                                                onClick={ () => setTaglineLang( lang.code ) }
+                                                className={ `px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${ taglineLang === lang.code
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                }` }
+                                            >
+                                                { lang.label }
+                                            </button>
+                                        ) ) }
+                                        <button
+                                            onClick={ handleTranslateTagline }
+                                            disabled={ translatingTagline || ! getLangValue( settings, 'site_tagline', defaultLang ) }
+                                            className="px-2 py-0.5 text-[11px] font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 rounded inline-flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Languages size={ 10 } />
+                                            { translatingTagline ? __( 'Translating...', 'snel-seo' ) : __( 'Translate', 'snel-seo' ) }
+                                        </button>
+                                    </div>
+                                ) }
+                            </div>
                             <input
                                 type="text"
-                                value={ getVal( 'site_tagline' ) }
-                                onChange={ ( e ) => update( 'site_tagline', e.target.value ) }
+                                value={ getTaglineVal() }
+                                onChange={ ( e ) => updateTagline( e.target.value ) }
                                 placeholder={ window.snelSeo?.siteDesc || '' }
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                             />
