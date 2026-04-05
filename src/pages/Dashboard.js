@@ -83,6 +83,8 @@ function ScannerCard() {
     const [ page, setPage ] = useState( 1 );
     const [ totalPages, setTotalPages ] = useState( 1 );
     const [ loadingResults, setLoadingResults ] = useState( false );
+    const [ scanLang, setScanLang ] = useState( '' ); // '' = all languages
+    const [ availableLangs, setAvailableLangs ] = useState( [] );
 
     const animateStatus = ( text ) => {
         return new Promise( ( resolve ) => {
@@ -103,6 +105,13 @@ function ScannerCard() {
     const loadSummary = useCallback( async () => {
         const data = await api( '/scanner/summary' );
         if ( data.total > 0 ) setSummary( data );
+    }, [] );
+
+    // Load available languages on mount.
+    useEffect( () => {
+        api( '/scanner/queue' ).then( ( data ) => {
+            setAvailableLangs( data.languages || [] );
+        } );
     }, [] );
 
     const loadResults = useCallback( async () => {
@@ -126,7 +135,8 @@ function ScannerCard() {
 
         const queue = await api( '/scanner/queue' );
         const postIds = queue.post_ids || [];
-        const languages = queue.languages || [ 'nl' ];
+        const allLangs = queue.languages || [ 'nl' ];
+        const languages = scanLang ? [ scanLang ] : allLangs;
         const total = postIds.length * languages.length;
         setProgress( { done: 0, total } );
 
@@ -184,15 +194,28 @@ function ScannerCard() {
                         ) }
                     </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={ startScan }
-                    disabled={ scanning }
-                    className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                    { scanning ? ( <><Loader2 size={ 14 } className="animate-spin" /> { __( 'Scanning...', 'snel-seo' ) }</> )
-                        : ( <><Play size={ 14 } /> { __( 'Scan All Pages', 'snel-seo' ) }</> ) }
-                </button>
+                <div className="flex items-center gap-2">
+                    <select
+                        value={ scanLang }
+                        onChange={ ( e ) => setScanLang( e.target.value ) }
+                        disabled={ scanning }
+                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 text-gray-600 disabled:opacity-50"
+                    >
+                        <option value="">{ __( 'All languages', 'snel-seo' ) }</option>
+                        { availableLangs.map( ( l ) => (
+                            <option key={ l } value={ l }>{ l.toUpperCase() } { __( 'only', 'snel-seo' ) }</option>
+                        ) ) }
+                    </select>
+                    <button
+                        type="button"
+                        onClick={ startScan }
+                        disabled={ scanning }
+                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                    >
+                        { scanning ? ( <><Loader2 size={ 14 } className="animate-spin" /> { __( 'Scanning...', 'snel-seo' ) }</> )
+                            : ( <><Play size={ 14 } /> { scanLang ? `Scan ${ scanLang.toUpperCase() }` : __( 'Scan All Pages', 'snel-seo' ) }</> ) }
+                    </button>
+                </div>
             </div>
 
             {/* Progress bar + live status */ }
@@ -271,9 +294,21 @@ function ScannerCard() {
                 </div>
             ) }
 
-            {/* Filters + Results */ }
+            {/* Scan History + Results */ }
             { summary && ! scanning && (
                 <>
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <Search size={ 14 } className="text-gray-400" />
+                            <h3 className="text-sm font-semibold text-gray-700">{ __( 'Scan Results', 'snel-seo' ) }</h3>
+                            <span className="text-xs text-gray-400">
+                                { summary.last_scan && `${ __( 'Last scan:', 'snel-seo' ) } ${ new Date( summary.last_scan ).toLocaleString() }` }
+                            </span>
+                        </div>
+                        <span className="text-xs text-gray-400">
+                            { __( 'Avg score:', 'snel-seo' ) } <strong className={ summary.avg_score >= 80 ? 'text-emerald-600' : summary.avg_score >= 50 ? 'text-amber-600' : 'text-red-600' }>{ summary.avg_score }</strong>
+                        </span>
+                    </div>
                     <div className="flex items-center gap-2 mb-3">
                         <select
                             value={ filterLang }
