@@ -23,6 +23,7 @@ function snel_seo_scanner_create_table() {
         post_id bigint(20) UNSIGNED NOT NULL,
         lang varchar(5) NOT NULL DEFAULT 'nl',
         url text NOT NULL,
+        content_hash varchar(32) DEFAULT NULL,
         checks longtext,
         score int(3) DEFAULT NULL,
         ai_summary text,
@@ -37,12 +38,13 @@ function snel_seo_scanner_create_table() {
 }
 register_activation_hook( SNEL_SEO_PLUGIN_DIR . 'snel-seo.php', 'snel_seo_scanner_create_table' );
 
-// Also create on admin_init if table doesn't exist (for existing installs).
+// Run dbDelta on admin_init to create or update the table schema.
 add_action( 'admin_init', function () {
-    global $wpdb;
-    $table = $wpdb->prefix . 'snel_seo_scans';
-    if ( $wpdb->get_var( "SHOW TABLES LIKE '$table'" ) !== $table ) {
+    $version_key = 'snel_seo_scans_db_version';
+    $current     = '1.1'; // Bump when schema changes.
+    if ( get_option( $version_key ) !== $current ) {
         snel_seo_scanner_create_table();
+        update_option( $version_key, $current );
     }
 } );
 
@@ -316,7 +318,29 @@ function snel_seo_scanner_batch( WP_REST_Request $request ) {
             $html      = wp_remote_retrieve_body( $response );
             $extracted = snel_seo_extract_from_html( $html );
 
-            // AI analysis.
+            // Hash the extracted content to detect changes.
+            $hash = md5( wp_json_encode( $extracted ) );
+
+            // Check if content hasn't changed since last scan.
+            $existing = $wpdb->get_row( $wpdb->prepare(
+                "SELECT content_hash, checks, score, ai_summary FROM $table WHERE post_id = %d AND lang = %s",
+                $post_id, $lang
+            ) );
+
+            if ( $existing && $existing->content_hash === $hash ) {
+                // Content unchanged — skip AI, keep existing result.
+                $results[] = array(
+                    'post_id' => $post_id,
+                    'lang'    => $lang,
+                    'url'     => $url,
+                    'score'   => (int) $existing->score,
+                    'summary' => $existing->ai_summary,
+                    'skipped' => true,
+                );
+                continue;
+            }
+
+            // Content changed or first scan — call AI.
             $analysis = snel_seo_scanner_analyze( $url, $lang, $extracted );
 
             if ( is_wp_error( $analysis ) ) {
@@ -334,13 +358,14 @@ function snel_seo_scanner_batch( WP_REST_Request $request ) {
 
             // Insert new result.
             $wpdb->insert( $table, array(
-                'post_id'    => $post_id,
-                'lang'       => $lang,
-                'url'        => $url,
-                'checks'     => wp_json_encode( $analysis['checks'] ?? array() ),
-                'score'      => (int) ( $analysis['score'] ?? 0 ),
-                'ai_summary' => $analysis['summary'] ?? '',
-                'scanned_at' => current_time( 'mysql' ),
+                'post_id'      => $post_id,
+                'lang'         => $lang,
+                'url'          => $url,
+                'content_hash' => $hash,
+                'checks'       => wp_json_encode( $analysis['checks'] ?? array() ),
+                'score'        => (int) ( $analysis['score'] ?? 0 ),
+                'ai_summary'   => $analysis['summary'] ?? '',
+                'scanned_at'   => current_time( 'mysql' ),
             ) );
 
             $results[] = array(

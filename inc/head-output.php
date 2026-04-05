@@ -210,12 +210,21 @@ add_filter( 'pre_get_document_title', function ( $title ) {
         if ( $post_type && ! in_array( $post_type, array( 'post', 'page' ), true ) ) {
             $cpt_config = snel_seo_get_cpt_config( $post_type );
             $template   = snel_seo_get_cpt_template( $cpt_config, 'title_template' );
+
+            // Use translated title if available (theme stores in _title_{lang}).
+            if ( ! $has_custom_title ) {
+                $lang    = snel_seo_get_current_lang();
+                $default = snel_seo_get_default_lang();
+                $translated_title = '';
+                if ( $lang !== $default ) {
+                    $translated_title = get_post_meta( $post_id, '_title_' . $lang, true );
+                }
+                $vars['title'] = $translated_title ?: get_the_title();
+            }
+
             if ( $template ) {
-                if ( ! $has_custom_title ) $vars['title'] = get_the_title();
                 return snel_seo_resolve_template( $template, $vars );
             }
-            // Default template for CPTs that have no custom template set.
-            if ( ! $has_custom_title ) $vars['title'] = get_the_title();
             return snel_seo_resolve_template( '%%title%% %%separator%% %%sitename%%', $vars );
         }
     }
