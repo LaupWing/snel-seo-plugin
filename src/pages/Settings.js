@@ -9,6 +9,7 @@ import Tabs from '../components/Tabs';
 import { SEPARATORS, getSeparatorChar, DEFAULT_TEMPLATES, MULTILINGUAL_KEYS, MAX_DESC_LENGTH } from '../config';
 import TranslateButton from '../components/TranslateButton';
 import LangSwitcher, { isTemplateOnly } from '../components/LangSwitcher';
+import Select from '../components/Select';
 
 function resolveTemplate( template, vars ) {
     let result = template;
@@ -1076,16 +1077,14 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     </p>
 
                     <div className="space-y-3">
-                        <select
+                        <Select
                             value={ config.schema_type || '' }
-                            onChange={ ( e ) => updateCptConfig( activeCpt, 'schema_type', e.target.value ) }
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
-                        >
-                            <option value="">{ __( 'None — no structured data', 'snel-seo' ) }</option>
-                            { SCHEMA_TYPES.map( ( st ) => (
-                                <option key={ st.type } value={ st.type }>{ st.label }</option>
-                            ) ) }
-                        </select>
+                            onChange={ ( v ) => updateCptConfig( activeCpt, 'schema_type', v ) }
+                            options={ [
+                                { value: '', label: __( 'None — no structured data', 'snel-seo' ) },
+                                ...SCHEMA_TYPES.map( ( st ) => ( { value: st.type, label: st.label } ) ),
+                            ] }
+                        />
 
                         { ( () => {
                             const schemaType = SCHEMA_TYPES.find( ( st ) => st.type === config.schema_type );
@@ -1117,16 +1116,14 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                                                 { field.label }
                                             </label>
                                             { field.input === 'meta' && (
-                                                <select
+                                                <Select
                                                     value={ sf[ field.key ] || '' }
-                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
-                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                                                >
-                                                    <option value="">{ __( '— skip —', 'snel-seo' ) }</option>
-                                                    { metaOptions.map( ( o ) => (
-                                                        <option key={ o.value } value={ o.value }>{ o.label }</option>
-                                                    ) ) }
-                                                </select>
+                                                    onChange={ ( v ) => updateSchemaField( field.key, v ) }
+                                                    options={ [
+                                                        { value: '', label: __( '— skip —', 'snel-seo' ) },
+                                                        ...metaOptions,
+                                                    ] }
+                                                />
                                             ) }
                                             { field.input === 'text' && (
                                                 <input
@@ -1138,28 +1135,24 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                                                 />
                                             ) }
                                             { field.input === 'select' && (
-                                                <select
+                                                <Select
                                                     value={ sf[ field.key ] || ( field.options?.[0]?.value || '' ) }
-                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
-                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                                                >
-                                                    <option value="">{ __( '— skip —', 'snel-seo' ) }</option>
-                                                    { ( field.options || [] ).map( ( o ) => (
-                                                        <option key={ o.value } value={ o.value }>{ o.label }</option>
-                                                    ) ) }
-                                                </select>
+                                                    onChange={ ( v ) => updateSchemaField( field.key, v ) }
+                                                    options={ [
+                                                        { value: '', label: __( '— skip —', 'snel-seo' ) },
+                                                        ...( field.options || [] ),
+                                                    ] }
+                                                />
                                             ) }
                                             { field.input === 'taxonomy' && (
-                                                <select
+                                                <Select
                                                     value={ sf[ field.key ] || '' }
-                                                    onChange={ ( e ) => updateSchemaField( field.key, e.target.value ) }
-                                                    className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                                                >
-                                                    <option value="">{ __( '— skip —', 'snel-seo' ) }</option>
-                                                    { taxonomies.map( ( t ) => (
-                                                        <option key={ t.name } value={ t.name }>{ t.label } ({ t.name })</option>
-                                                    ) ) }
-                                                </select>
+                                                    onChange={ ( v ) => updateSchemaField( field.key, v ) }
+                                                    options={ [
+                                                        { value: '', label: __( '— skip —', 'snel-seo' ) },
+                                                        ...taxonomies.map( ( t ) => ( { value: t.name, label: `${ t.label } (${ t.name })` } ) ),
+                                                    ] }
+                                                />
                                             ) }
                                         </div>
                                     ) ) }

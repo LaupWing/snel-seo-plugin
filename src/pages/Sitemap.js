@@ -1,6 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Map, Save, Loader2, ExternalLink, Eye, EyeOff, Search } from 'lucide-react';
+import Select from '../components/Select';
 
 export default function Sitemap() {
     const [ settings, setSettings ] = useState( null );
@@ -242,16 +243,14 @@ export default function Sitemap() {
                                     className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:shadow-[0_0_0_1px_#3b82f6]"
                                 />
                             </div>
-                            <select
+                            <Select
                                 value={ typeFilter }
-                                onChange={ ( e ) => setTypeFilter( e.target.value ) }
-                                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                            >
-                                <option value="all">{ __( 'All types', 'snel-seo' ) }</option>
-                                { types.map( ( t ) => (
-                                    <option key={ t } value={ t }>{ t.charAt( 0 ).toUpperCase() + t.slice( 1 ) + 's' }</option>
-                                ) ) }
-                            </select>
+                                onChange={ setTypeFilter }
+                                options={ [
+                                    { value: 'all', label: __( 'All types', 'snel-seo' ) },
+                                    ...types.map( ( t ) => ( { value: t, label: t.charAt( 0 ).toUpperCase() + t.slice( 1 ) + 's' } ) ),
+                                ] }
+                            />
                         </div>
 
                         {/* Table */}

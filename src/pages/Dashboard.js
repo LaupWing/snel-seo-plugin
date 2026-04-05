@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Search, Settings, ArrowRight, Shield, Globe, Play, Loader2, CheckCircle, AlertTriangle, XCircle, ChevronDown } from 'lucide-react';
+import Select from '../components/Select';
 
 function api( path, opts = {} ) {
     return fetch( `${ window.snelSeo.restUrl }${ path }`, {
@@ -195,17 +196,15 @@ function ScannerCard() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <select
+                    <Select
                         value={ scanLang }
-                        onChange={ ( e ) => setScanLang( e.target.value ) }
+                        onChange={ setScanLang }
                         disabled={ scanning }
-                        className="text-xs border border-gray-200 rounded-lg px-2.5 py-2 text-gray-600 disabled:opacity-50"
-                    >
-                        <option value="">{ __( 'All languages', 'snel-seo' ) }</option>
-                        { availableLangs.map( ( l ) => (
-                            <option key={ l } value={ l }>{ l.toUpperCase() } { __( 'only', 'snel-seo' ) }</option>
-                        ) ) }
-                    </select>
+                        options={ [
+                            { value: '', label: __( 'All languages', 'snel-seo' ) },
+                            ...availableLangs.map( ( l ) => ( { value: l, label: `${ l.toUpperCase() } ${ __( 'only', 'snel-seo' ) }` } ) ),
+                        ] }
+                    />
                     <button
                         type="button"
                         onClick={ startScan }
@@ -310,25 +309,23 @@ function ScannerCard() {
                         </span>
                     </div>
                     <div className="flex items-center gap-2 mb-3">
-                        <select
+                        <Select
                             value={ filterLang }
-                            onChange={ ( e ) => { setFilterLang( e.target.value ); setPage( 1 ); } }
-                            className="text-xs border border-gray-200 rounded-md px-2 py-1.5 text-gray-600"
-                        >
-                            <option value="">{ __( 'All languages', 'snel-seo' ) }</option>
-                            { ( summary.per_lang || [] ).map( ( l ) => (
-                                <option key={ l.lang } value={ l.lang }>{ l.lang.toUpperCase() }</option>
-                            ) ) }
-                        </select>
-                        <select
+                            onChange={ ( v ) => { setFilterLang( v ); setPage( 1 ); } }
+                            options={ [
+                                { value: '', label: __( 'All languages', 'snel-seo' ) },
+                                ...( summary.per_lang || [] ).map( ( l ) => ( { value: l.lang, label: l.lang.toUpperCase() } ) ),
+                            ] }
+                        />
+                        <Select
                             value={ filterStatus }
-                            onChange={ ( e ) => { setFilterStatus( e.target.value ); setPage( 1 ); } }
-                            className="text-xs border border-gray-200 rounded-md px-2 py-1.5 text-gray-600"
-                        >
-                            <option value="">{ __( 'All statuses', 'snel-seo' ) }</option>
-                            <option value="good">{ __( 'Good (80+)', 'snel-seo' ) }</option>
-                            <option value="issues">{ __( 'Issues (<80)', 'snel-seo' ) }</option>
-                        </select>
+                            onChange={ ( v ) => { setFilterStatus( v ); setPage( 1 ); } }
+                            options={ [
+                                { value: '', label: __( 'All statuses', 'snel-seo' ) },
+                                { value: 'good', label: __( 'Good (80+)', 'snel-seo' ) },
+                                { value: 'issues', label: __( 'Issues (<80)', 'snel-seo' ) },
+                            ] }
+                        />
                     </div>
 
                     { loadingResults ? (
