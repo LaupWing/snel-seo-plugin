@@ -591,8 +591,10 @@ export default function Settings() {
                             onChange={ ( v ) => update( 'metadesc_home', v ) }
                             badgeGroup="homepage"
                             maxLength={ MAX_DESC_LENGTH }
+                            placeholder="%%sitename%% %%separator%% %%sitedesc%%"
+                            defaultValue="%%sitename%% %%separator%% %%sitedesc%%"
                             showReset={ activeLang === defaultLang }
-                            hint={ getVal( 'metadesc_home' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_home' ), previewVars ) }</strong></> : null }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }</strong></> }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_home', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'metadesc_home', 'description' ) }
@@ -604,7 +606,7 @@ export default function Settings() {
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl }
-                            description={ getVal( 'metadesc_home' ) }
+                            description={ getVal( 'metadesc_home' ) || '%%sitename%% %%separator%% %%sitedesc%%' }
                         />
                     </div>
                 ) }
@@ -633,8 +635,10 @@ export default function Settings() {
                             onChange={ ( v ) => update( 'metadesc_page', v ) }
                             badgeGroup="page"
                             maxLength={ MAX_DESC_LENGTH }
+                            placeholder="%%title%% %%separator%% %%sitedesc%%"
+                            defaultValue="%%title%% %%separator%% %%sitedesc%%"
                             showReset={ activeLang === defaultLang }
-                            hint={ getVal( 'metadesc_page' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_page' ), previewVars ) }</strong></> : null }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_page' ) || '%%title%% %%separator%% %%sitedesc%%', previewVars ) }</strong></> }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_page', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'metadesc_page', 'description' ) }
@@ -646,7 +650,7 @@ export default function Settings() {
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_page' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl + '/example-page/' }
-                            description={ getVal( 'metadesc_page' ) }
+                            description={ getVal( 'metadesc_page' ) || '%%title%% %%separator%% %%sitedesc%%' }
                         />
                     </div>
                 ) }
@@ -675,8 +679,10 @@ export default function Settings() {
                             onChange={ ( v ) => update( 'metadesc_post', v ) }
                             badgeGroup="post"
                             maxLength={ MAX_DESC_LENGTH }
+                            placeholder="%%title%% %%separator%% %%sitedesc%%"
+                            defaultValue="%%title%% %%separator%% %%sitedesc%%"
                             showReset={ activeLang === defaultLang }
-                            hint={ getVal( 'metadesc_post' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_post' ), previewVars ) }</strong></> : null }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getVal( 'metadesc_post' ) || '%%title%% %%separator%% %%sitedesc%%', previewVars ) }</strong></> }
                             action={ isMultilingual && activeLang !== defaultLang && getLangValue( settings, 'metadesc_post', defaultLang ) ? (
                                 <TranslateButton
                                     onTranslate={ handleTranslateSingle( 'metadesc_post', 'description' ) }
@@ -688,7 +694,7 @@ export default function Settings() {
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_post' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl + '/example-post/' }
-                            description={ getVal( 'metadesc_post' ) }
+                            description={ getVal( 'metadesc_post' ) || '%%title%% %%separator%% %%sitedesc%%' }
                         />
                     </div>
                 ) }
@@ -966,41 +972,13 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     } )() }
                 />
 
-                {/* Meta description template */ }
-                <TemplateInput
-                    label={ __( 'Meta Description Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
-                    value={ getCptVal( 'metadesc_template' ) }
-                    onChange={ ( v ) => updateCptVal( 'metadesc_template', v ) }
-                    badgeGroup="page"
-                    maxLength={ MAX_DESC_LENGTH }
-                    showReset={ activeLang === defaultLang }
-                    hint={ getCptVal( 'metadesc_template' ) ? <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getCptVal( 'metadesc_template' ), { ...previewVars, title: currentCpt?.label || '' } ) }</strong></> : null }
-                    action={ isMultilingual && activeLang !== defaultLang && ( () => {
-                        const val = config.metadesc_template;
-                        return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
-                            <TranslateButton
-                                onTranslate={ handleCptTranslateSingle( 'metadesc_template', 'description' ) }
-                                label={ __( 'Translate', 'snel-seo' ) }
-                                size="sm"
-                            />
-                        ) : null;
-                    } )() }
-                />
-
-                {/* Google Preview */ }
-                <GooglePreview
-                    title={ resolveTemplate( getCptVal( 'title_template' ) || '%%title%% %%separator%% %%sitename%%', { ...previewVars, title: currentCpt?.label || '' } ) }
-                    url={ window.snelSeo?.siteUrl + '/' + activeCpt + '/example/' }
-                    description={ getCptVal( 'metadesc_template' ) }
-                />
-
-                {/* Description Fallback Fields */ }
+                {/* Description Fields */ }
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                        { __( 'Description Fallback Fields', 'snel-seo' ) }
+                        { __( 'Description Fields', 'snel-seo' ) }
                     </label>
                     <p className="text-xs text-gray-400 mb-3">
-                        { __( 'When no custom SEO description is set, these fields will be tried in order. The correct language is resolved automatically.', 'snel-seo' ) }
+                        { __( 'Select which fields to use as the meta description. They are tried in order — the first one with a value wins. Language is resolved automatically.', 'snel-seo' ) }
                     </p>
 
                     {/* Selected fallback fields (ordered) */ }
@@ -1058,7 +1036,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                         </div>
                     ) : (
                         <div className="px-3 py-4 mb-3 border-2 border-dashed border-gray-300 rounded-lg text-center text-xs text-gray-500">
-                            { __( 'No fallback fields selected. The plugin will use excerpt and post content as fallback.', 'snel-seo' ) }
+                            { __( 'No description fields selected. The meta description template below will be used instead.', 'snel-seo' ) }
                         </div>
                     ) }
 
@@ -1090,6 +1068,36 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                         </div>
                     ) }
                 </div>
+
+                {/* Meta description template (fallback when no field match) */ }
+                <TemplateInput
+                    label={ __( 'Meta Description Template (Fallback)', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                    value={ getCptVal( 'metadesc_template' ) }
+                    onChange={ ( v ) => updateCptVal( 'metadesc_template', v ) }
+                    badgeGroup="page"
+                    maxLength={ MAX_DESC_LENGTH }
+                    placeholder="%%title%% %%separator%% %%sitedesc%%"
+                    defaultValue="%%title%% %%separator%% %%sitedesc%%"
+                    showReset={ activeLang === defaultLang }
+                    hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getCptVal( 'metadesc_template' ) || '%%title%% %%separator%% %%sitedesc%%', { ...previewVars, title: currentCpt?.label || '' } ) }</strong></> }
+                    action={ isMultilingual && activeLang !== defaultLang && ( () => {
+                        const val = config.metadesc_template;
+                        return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
+                            <TranslateButton
+                                onTranslate={ handleCptTranslateSingle( 'metadesc_template', 'description' ) }
+                                label={ __( 'Translate', 'snel-seo' ) }
+                                size="sm"
+                            />
+                        ) : null;
+                    } )() }
+                />
+
+                {/* Google Preview */ }
+                <GooglePreview
+                    title={ resolveTemplate( getCptVal( 'title_template' ) || '%%title%% %%separator%% %%sitename%%', { ...previewVars, title: currentCpt?.label || '' } ) }
+                    url={ window.snelSeo?.siteUrl + '/' + activeCpt + '/example/' }
+                    description={ getCptVal( 'metadesc_template' ) || '%%title%% %%separator%% %%sitedesc%%' }
+                />
 
                 {/* Schema / Structured Data */ }
                 <div>
