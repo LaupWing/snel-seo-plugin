@@ -196,10 +196,21 @@ function snel_seo_scanner_analyze( $url, $lang, $extracted ) {
         return $response;
     }
 
+    $status_code = wp_remote_retrieve_response_code( $response );
+    if ( $status_code !== 200 ) {
+        $error_body = wp_remote_retrieve_body( $response );
+        return new WP_Error( 'ai_error', 'OpenAI returned HTTP ' . $status_code . ': ' . mb_substr( $error_body, 0, 200 ) );
+    }
+
     $body = json_decode( wp_remote_retrieve_body( $response ), true );
     $content = $body['choices'][0]['message']['content'] ?? '';
+    $result = json_decode( $content, true );
 
-    return json_decode( $content, true );
+    if ( ! $result || ! isset( $result['checks'] ) ) {
+        return new WP_Error( 'parse_error', 'Failed to parse AI response.' );
+    }
+
+    return $result;
 }
 
 /**
