@@ -86,9 +86,22 @@ function snel_seo_extract_from_html( $html ) {
         }
     }
 
-    // Body text (first 500 chars of visible content).
-    if ( preg_match( '/<body[^>]*>(.*)<\/body>/is', $html, $m ) ) {
-        $text = wp_strip_all_tags( $m[1] );
+    // Body text (first 500 chars of main content area, excluding nav/footer).
+    // Try common main content selectors, fall back to <body>.
+    $content_html = '';
+    if ( preg_match( '/<main[^>]*>(.*?)<\/main>/is', $html, $m ) ) {
+        $content_html = $m[1];
+    } elseif ( preg_match( '/<article[^>]*>(.*?)<\/article>/is', $html, $m ) ) {
+        $content_html = $m[1];
+    } elseif ( preg_match( '/<body[^>]*>(.*)<\/body>/is', $html, $m ) ) {
+        $content_html = $m[1];
+    }
+
+    // Strip nav, header, footer elements from the content.
+    $content_html = preg_replace( '/<(nav|header|footer)\b[^>]*>.*?<\/\1>/is', '', $content_html );
+
+    if ( $content_html ) {
+        $text = wp_strip_all_tags( $content_html );
         $text = preg_replace( '/\s+/', ' ', trim( $text ) );
         $data['body_text'] = mb_substr( $text, 0, 500 );
     }
