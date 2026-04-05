@@ -310,16 +310,17 @@ function ScannerCard() {
                     </div>
                     <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-1">
-                            { [ { code: '', label: __( 'All', 'snel-seo' ) }, ...( summary.per_lang || [] ).map( ( l ) => ( { code: l.lang, label: l.lang.toUpperCase() } ) ) ].map( ( l ) => (
+                            { [ { code: '', label: __( 'All', 'snel-seo' ), isAll: true }, ...availableLangs.map( ( code, i ) => ( { code, label: code.toUpperCase(), isDefault: i === 0 } ) ) ].map( ( l ) => (
                                 <button
                                     key={ l.code }
                                     onClick={ () => { setFilterLang( l.code ); setPage( 1 ); } }
                                     className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ filterLang === l.code
-                                        ? 'bg-purple-600 text-white'
-                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        ? l.isDefault ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-purple-600 text-white'
+                                        : l.isDefault ? 'bg-purple-50 text-purple-600 border border-purple-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                     }` }
                                 >
                                     { l.label }
+                                    { l.isDefault && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
                                 </button>
                             ) ) }
                         </div>
