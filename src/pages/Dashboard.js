@@ -50,7 +50,7 @@ function ScanResult( { result } ) {
                     <p className="text-xs text-gray-400 truncate">{ result.url } · { result.lang?.toUpperCase() }</p>
                 </div>
                 <p className="text-xs text-gray-500 hidden md:block max-w-xs truncate">{ result.ai_summary }</p>
-                <ChevronDown size={ 16 } className={ `text-gray-400 transition-transform ${ open ? 'rotate-180' : '' }` } />
+                <ChevronDown size={ 16 } className={ `shrink-0 text-gray-400 transition-transform ${ open ? 'rotate-180' : '' }` } />
             </button>
             { open && (
                 <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 space-y-2">
