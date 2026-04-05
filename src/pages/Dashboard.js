@@ -308,15 +308,21 @@ function ScannerCard() {
                             { __( 'Avg score:', 'snel-seo' ) } <strong className={ summary.avg_score >= 80 ? 'text-emerald-600' : summary.avg_score >= 50 ? 'text-amber-600' : 'text-red-600' }>{ summary.avg_score }</strong>
                         </span>
                     </div>
-                    <div className="flex items-center gap-2 mb-3">
-                        <Select
-                            value={ filterLang }
-                            onChange={ ( v ) => { setFilterLang( v ); setPage( 1 ); } }
-                            options={ [
-                                { value: '', label: __( 'All languages', 'snel-seo' ) },
-                                ...( summary.per_lang || [] ).map( ( l ) => ( { value: l.lang, label: l.lang.toUpperCase() } ) ),
-                            ] }
-                        />
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-1">
+                            { [ { code: '', label: __( 'All', 'snel-seo' ) }, ...( summary.per_lang || [] ).map( ( l ) => ( { code: l.lang, label: l.lang.toUpperCase() } ) ) ].map( ( l ) => (
+                                <button
+                                    key={ l.code }
+                                    onClick={ () => { setFilterLang( l.code ); setPage( 1 ); } }
+                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ filterLang === l.code
+                                        ? 'bg-purple-600 text-white'
+                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                    }` }
+                                >
+                                    { l.label }
+                                </button>
+                            ) ) }
+                        </div>
                         <Select
                             value={ filterStatus }
                             onChange={ ( v ) => { setFilterStatus( v ); setPage( 1 ); } }
