@@ -43,6 +43,7 @@ require_once SNEL_SEO_PLUGIN_DIR . 'inc/sitemap.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/admin.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/meta-box.php';
 require_once SNEL_SEO_PLUGIN_DIR . 'inc/rest-api.php';
+require_once SNEL_SEO_PLUGIN_DIR . 'inc/scanner.php';
 
 // Activation hook.
 register_activation_hook( __FILE__, 'snel_seo_create_redirects_table' );
