@@ -8,6 +8,7 @@ import GooglePreview from '../components/GooglePreview';
 import Tabs from '../components/Tabs';
 import { SEPARATORS, getSeparatorChar, DEFAULT_TEMPLATES, MULTILINGUAL_KEYS, MAX_DESC_LENGTH } from '../config';
 import TranslateButton from '../components/TranslateButton';
+import LangSwitcher, { isTemplateOnly } from '../components/LangSwitcher';
 
 function resolveTemplate( template, vars ) {
     let result = template;
@@ -359,38 +360,26 @@ export default function Settings() {
             {/* Language switcher — for Homepage, Pages, Posts tabs */ }
             { isMultilingual && [ 'homepage', 'pages', 'posts' ].includes( activeTab ) && (
                 <div className="flex items-center justify-between px-6 py-3 bg-white border border-gray-200 border-b-0 rounded-t-lg">
-                    <div className="flex items-center gap-1">
-                        { languages.map( ( lang ) => {
+                    <LangSwitcher
+                        languages={ languages }
+                        activeLang={ activeLang }
+                        defaultLang={ defaultLang }
+                        onChange={ setActiveLang }
+                        getStatus={ ( code ) => {
                             const titleKey = currentTabKeys[0];
                             const descKey = currentTabKeys[1];
-                            const hasTitle = !! getLangValue( settings, titleKey, lang.code );
-                            const hasDesc = !! getLangValue( settings, descKey, lang.code );
-                            return (
-                                <button
-                                    key={ lang.code }
-                                    onClick={ () => setActiveLang( lang.code ) }
-                                    className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                        ? lang.default ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-blue-600 text-white'
-                                        : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                    }` }
-                                >
-                                    { lang.label }
-                                    { lang.default && (
-                                        <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span>
-                                    ) }
-                                    { ! lang.default && hasTitle && hasDesc && (
-                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
-                                    ) }
-                                    { ! lang.default && ( hasTitle || hasDesc ) && ! ( hasTitle && hasDesc ) && (
-                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                                    ) }
-                                    { ! lang.default && ! hasTitle && ! hasDesc && (
-                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
-                                    ) }
-                                </button>
-                            );
-                        } ) }
-                    </div>
+                            const titleVal = getLangValue( settings, titleKey, code );
+                            const descVal = getLangValue( settings, descKey, code );
+                            const defaultTitle = getLangValue( settings, titleKey, defaultLang );
+                            const defaultDesc = getLangValue( settings, descKey, defaultLang );
+                            // "done" if: has own value, OR default is template-only, OR nothing set anywhere (hardcoded default is template-only)
+                            const titleDone = !! titleVal || isTemplateOnly( defaultTitle ) || ! defaultTitle;
+                            const descDone = !! descVal || isTemplateOnly( defaultDesc ) || ! defaultDesc;
+                            if ( titleDone && descDone ) return 'complete';
+                            if ( titleDone || descDone ) return 'partial';
+                            return 'empty';
+                        } }
+                    />
                     <Tooltip
                             text={ ! hasDefaultContent
                                 ? `Fill in content in ${ languages.find( ( l ) => l.default )?.label || defaultLang.toUpperCase() } (default) first.`
@@ -453,39 +442,25 @@ export default function Settings() {
                                     { isMultilingual && ` (${ taglineLang.toUpperCase() })` }
                                 </label>
                                 { isMultilingual && (
-                                    <div className="flex items-center gap-1.5">
-                                        { languages.map( ( lang ) => {
-                                            const hasVal = !! getLangValue( settings, 'site_tagline', lang.code );
-                                            return (
-                                                <button
-                                                    key={ lang.code }
-                                                    onClick={ () => setTaglineLang( lang.code ) }
-                                                    className={ `px-2 py-0.5 text-[11px] font-medium rounded transition-colors ${ taglineLang === lang.code
-                                                        ? 'bg-blue-600 text-white'
-                                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                                    }` }
-                                                >
-                                                    { lang.label }
-                                                    { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
-                                                    { ! lang.default && hasVal && (
-                                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
-                                                    ) }
-                                                    { ! lang.default && ! hasVal && getTaglineSource() && (
-                                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                                                    ) }
-                                                    { ! lang.default && ! hasVal && ! getTaglineSource() && (
-                                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
-                                                    ) }
-                                                </button>
-                                            );
-                                        } ) }
+                                    <LangSwitcher
+                                        languages={ languages }
+                                        activeLang={ taglineLang }
+                                        defaultLang={ defaultLang }
+                                        onChange={ setTaglineLang }
+                                        size="sm"
+                                        getStatus={ ( code ) => {
+                                            const hasVal = !! getLangValue( settings, 'site_tagline', code );
+                                            if ( hasVal ) return 'complete';
+                                            return getTaglineSource() ? 'partial' : 'empty';
+                                        } }
+                                    >
                                         <TranslateButton
                                             onTranslate={ handleTranslateTagline }
                                             disabled={ ! getTaglineSource() }
                                             label={ taglineLang === defaultLang ? __( 'Translate All', 'snel-seo' ) : __( 'Translate', 'snel-seo' ) }
                                             size="sm"
                                         />
-                                    </div>
+                                    </LangSwitcher>
                                 ) }
                             </div>
                             <p className="text-[11px] text-gray-400 mb-1.5">
@@ -908,36 +883,25 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                 {/* Language switcher + Translate All */ }
                 { isMultilingual && (
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                            { languages.map( ( lang ) => {
+                        <LangSwitcher
+                            languages={ languages }
+                            activeLang={ activeLang }
+                            defaultLang={ defaultLang }
+                            onChange={ setActiveLang }
+                            getStatus={ ( code ) => {
                                 const titleVal = config.title_template;
                                 const descVal = config.metadesc_template;
-                                const hasTitle = !! ( typeof titleVal === 'object' ? titleVal[ lang.code ] : ( lang.default ? titleVal : '' ) );
-                                const hasDesc = !! ( typeof descVal === 'object' ? descVal[ lang.code ] : ( lang.default ? descVal : '' ) );
-                                return (
-                                    <button
-                                        key={ lang.code }
-                                        onClick={ () => setActiveLang( lang.code ) }
-                                        className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ activeLang === lang.code
-                                            ? 'bg-blue-600 text-white'
-                                            : lang.default ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                                        }` }
-                                    >
-                                        { lang.label }
-                                        { lang.default && <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span> }
-                                        { ! lang.default && hasTitle && hasDesc && (
-                                            <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
-                                        ) }
-                                        { ! lang.default && ( hasTitle || hasDesc ) && ! ( hasTitle && hasDesc ) && (
-                                            <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                                        ) }
-                                        { ! lang.default && ! hasTitle && ! hasDesc && (
-                                            <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
-                                        ) }
-                                    </button>
-                                );
-                            } ) }
-                        </div>
+                                const rawTitle = typeof titleVal === 'object' ? titleVal[ code ] : '';
+                                const rawDesc = typeof descVal === 'object' ? descVal[ code ] : '';
+                                const defaultTitle = typeof titleVal === 'object' ? titleVal[ defaultLang ] : titleVal;
+                                const defaultDesc = typeof descVal === 'object' ? descVal[ defaultLang ] : descVal;
+                                const titleDone = !! rawTitle || isTemplateOnly( defaultTitle ) || ! defaultTitle;
+                                const descDone = !! rawDesc || isTemplateOnly( defaultDesc ) || ! defaultDesc;
+                                if ( titleDone && descDone ) return 'complete';
+                                if ( titleDone || descDone ) return 'partial';
+                                return 'empty';
+                            } }
+                        />
                         { hasCptSource && (
                             <TranslateButton
                                 onTranslate={ handleCptTranslateAll }
