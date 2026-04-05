@@ -315,8 +315,8 @@ function ScannerCard() {
                                     key={ l.code }
                                     onClick={ () => { setFilterLang( l.code ); setPage( 1 ); } }
                                     className={ `px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${ filterLang === l.code
-                                        ? l.isDefault ? 'bg-purple-600 text-white ring-2 ring-purple-300' : 'bg-purple-600 text-white'
-                                        : l.isDefault ? 'bg-purple-50 text-purple-600 border border-purple-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        ? l.isDefault ? 'bg-blue-600 text-white ring-2 ring-blue-300' : 'bg-blue-600 text-white'
+                                        : l.isDefault ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                                     }` }
                                 >
                                     { l.label }
