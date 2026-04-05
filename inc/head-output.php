@@ -317,6 +317,43 @@ add_action( 'wp_head', function () {
         }
     }
 
+    // For singular CPTs: try description fields first, then excerpt, then template.
+    if ( ! $description && is_singular() && ! is_singular( 'post' ) && ! is_page() && ! is_front_page() ) {
+        $post_type = get_post_type();
+        if ( $post_type ) {
+            $cpt_config    = snel_seo_get_cpt_config( $post_type );
+            $fallback_keys = isset( $cpt_config['desc_fallback_keys'] ) ? $cpt_config['desc_fallback_keys'] : array();
+
+            // 1. Description fields (configured in Settings > Post Types).
+            foreach ( $fallback_keys as $field_key ) {
+                $text = snel_seo_resolve_meta_field( get_queried_object_id(), $field_key );
+                if ( $text ) {
+                    $text = preg_replace( '/\s+/', ' ', trim( $text ) );
+                    if ( strlen( $text ) > 10 ) {
+                        $description = mb_substr( $text, 0, 155 ) . '…';
+                        break;
+                    }
+                }
+            }
+
+            // 2. Excerpt.
+            if ( ! $description ) {
+                $excerpt = get_the_excerpt( get_queried_object_id() );
+                if ( $excerpt && $excerpt !== __( 'No excerpt', 'default' ) ) {
+                    $description = wp_trim_words( wp_strip_all_tags( $excerpt ), 25, '…' );
+                }
+            }
+
+            // 3. CPT template (fallback).
+            if ( ! $description ) {
+                $tpl = snel_seo_get_cpt_template( $cpt_config, 'metadesc_template' );
+                if ( $tpl ) {
+                    $description = $tpl;
+                }
+            }
+        }
+    }
+
     if ( ! $description ) {
         if ( is_front_page() || is_home() ) {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-home-wpseo' );
@@ -324,16 +361,6 @@ add_action( 'wp_head', function () {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-post' );
         } elseif ( is_page() ) {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-page' );
-        } elseif ( is_singular() ) {
-            // Custom post type template.
-            $post_type = get_post_type();
-            if ( $post_type ) {
-                $cpt_config = snel_seo_get_cpt_config( $post_type );
-                $tpl        = snel_seo_get_cpt_template( $cpt_config, 'metadesc_template' );
-                if ( $tpl ) {
-                    $description = $tpl;
-                }
-            }
         } elseif ( is_tax() || is_category() || is_tag() ) {
             $term = get_queried_object();
             if ( $term && ! empty( $term->description ) ) {
