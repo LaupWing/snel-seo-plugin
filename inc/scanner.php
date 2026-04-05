@@ -133,9 +133,8 @@ function snel_seo_scanner_analyze( $url, $lang, $extracted ) {
         "1. title — Does the title exist and is it in the correct language (%s)?\n" .
         "2. meta_desc — Does the meta description exist and is it in the correct language?\n" .
         "3. h1 — Does exactly one H1 exist and is it in the correct language?\n" .
-        "4. content_lang — Is the PRIMARY/MAIN content in the correct language? Ignore navigation, footer, and UI elements — only judge the main product/page content.\n" .
-        "5. desc_relevance — Is the meta description relevant to the actual page content?\n\n" .
-        "IMPORTANT: The body text includes navigation, footer, and UI elements in multiple languages — this is NORMAL for a multilingual site. Only check the main content area.\n\n" .
+        "4. content_lang — Is the PRIMARY product/page content in the correct language? This is a multilingual website — the body text WILL contain taglines, slogans, UI labels, button text, and form labels in other languages (like 'A WORLD OF BEAUTIFUL...' in English, or labels like 'VOORNAAM', 'VERZENDEN'). These are EXPECTED and should NOT count against the language check. Only judge the actual product description, heading, and informational text.\n" .
+        "5. desc_relevance — Is the meta description relevant to the actual page content? If the meta description mentions the product/page topic, mark as ok.\n\n" .
         "Scoring: Each check is worth 20 points. ok=20, warning=10, error=0. Score is the sum (0-100).\n\n" .
         "Return your analysis as JSON.",
         $url,
