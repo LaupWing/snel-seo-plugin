@@ -372,8 +372,21 @@ add_action( 'wp_head', function () {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-page' );
         } elseif ( is_tax() || is_category() || is_tag() ) {
             $term = get_queried_object();
-            if ( $term && ! empty( $term->description ) ) {
-                $description = mb_substr( wp_strip_all_tags( $term->description ), 0, 155 );
+            if ( $term ) {
+                $lang    = snel_seo_get_current_lang();
+                $default = snel_seo_get_default_lang();
+                $desc    = '';
+                // Try translated description first.
+                if ( $lang !== $default ) {
+                    $desc = get_term_meta( $term->term_id, '_desc_' . $lang, true );
+                }
+                // Fall back to default language description.
+                if ( ! $desc && ! empty( $term->description ) ) {
+                    $desc = $term->description;
+                }
+                if ( $desc ) {
+                    $description = mb_substr( wp_strip_all_tags( $desc ), 0, 155 );
+                }
             }
         }
     }
