@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Modal, SelectControl } from '@wordpress/components';
-import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk, FlaskConical, CheckCircle2, XCircle, Filter } from 'lucide-react';
+import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk, FlaskConical, CheckCircle2, XCircle, Filter, TrendingUp } from 'lucide-react';
 import Tabs from '../components/Tabs';
 
 const TABS = [
@@ -502,6 +502,34 @@ export default function Redirects() {
             </div>
 
             <Tabs tabs={ TABS } active={ activeTab } onChange={ setActiveTab } />
+
+            {/* Stats cards */}
+            { ! loading && redirects.length > 0 && (
+                <div className="grid grid-cols-3 gap-4 mb-5 mt-1">
+                    <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2 text-gray-500 mb-1">
+                            <ArrowRightLeft size={ 14 } />
+                            <span className="text-xs font-medium uppercase tracking-wide">{ __( 'Total Redirects', 'snel-seo' ) }</span>
+                        </div>
+                        <p className="text-2xl font-bold text-gray-900">{ redirects.length.toLocaleString() }</p>
+                    </div>
+                    <div className="bg-white border border-emerald-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2 text-emerald-600 mb-1">
+                            <CheckCircle2 size={ 14 } />
+                            <span className="text-xs font-medium uppercase tracking-wide">{ __( 'Successful Redirections', 'snel-seo' ) }</span>
+                        </div>
+                        <p className="text-2xl font-bold text-emerald-700">{ redirects.reduce( ( sum, r ) => sum + parseInt( r.hits || 0 ), 0 ).toLocaleString() }</p>
+                    </div>
+                    <div className="bg-white border border-amber-200 rounded-lg px-4 py-3">
+                        <div className="flex items-center gap-2 text-amber-600 mb-1">
+                            <TrendingUp size={ 14 } />
+                            <span className="text-xs font-medium uppercase tracking-wide">{ __( 'Active Redirects', 'snel-seo' ) }</span>
+                        </div>
+                        <p className="text-2xl font-bold text-amber-700">{ redirects.filter( ( r ) => parseInt( r.hits || 0 ) > 0 ).length.toLocaleString() }</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{ __( 'with at least 1 hit', 'snel-seo' ) }</p>
+                    </div>
+                </div>
+            ) }
 
             { activeTab === 'redirects' && (
                 <>
