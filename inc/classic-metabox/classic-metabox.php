@@ -122,6 +122,16 @@ function snel_seo_classic_metabox_render( $post ) {
         .snel-seo-classic .snel-seo-char-count.over { color: #d63638; }
         .snel-seo-classic .snel-seo-translate-status { margin-left: 8px; font-style: italic; color: #666; font-size: 12px; }
 
+        /* Tabs */
+        .snel-seo-classic .snel-seo-tabs { display: flex; gap: 0; border-bottom: 2px solid #e0e0e0; margin-bottom: 16px; }
+        .snel-seo-classic .snel-seo-tab { padding: 8px 16px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #999; background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+        .snel-seo-classic .snel-seo-tab:hover { color: #50575e; }
+        .snel-seo-classic .snel-seo-tab.active { color: #2271b1; border-bottom-color: #2271b1; }
+        .snel-seo-classic .snel-seo-tab-panel { display: none; }
+        .snel-seo-classic .snel-seo-tab-panel.active { display: block; }
+        .snel-seo-classic .snel-seo-info-box { background: #f0f6fc; border: 1px solid #c5d9ed; border-radius: 4px; padding: 10px 14px; font-size: 12px; color: #2271b1; margin-bottom: 14px; line-height: 1.5; }
+        .snel-seo-classic .snel-seo-info-box.amber { background: #fcf9e8; border-color: #dba617; color: #8a6d00; }
+
         /* Google Preview */
         .snel-seo-classic .snel-seo-gp { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-top: 10px; }
         .snel-seo-classic .snel-seo-gp-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -139,123 +149,203 @@ function snel_seo_classic_metabox_render( $post ) {
 
     <div class="snel-seo-classic">
 
-        <?php if ( $multilingual ) : ?>
-        <div class="snel-seo-lang-switcher">
-            <?php foreach ( $languages as $lang ) :
-                $code = $lang['code'];
-                $has_title = ! empty( $seo_titles[ $code ] );
-                $has_desc  = ! empty( $seo_descs[ $code ] );
-                $dot_class = '';
-                if ( ! $lang['default'] ) {
-                    if ( $has_title && $has_desc ) $dot_class = 'snel-seo-dot-green';
-                    elseif ( $has_title || $has_desc ) $dot_class = 'snel-seo-dot-amber';
-                    else $dot_class = 'snel-seo-dot-gray';
-                }
-            ?>
-                <button type="button"
-                    class="snel-seo-lang-btn<?php echo $code === $default_lang ? ' active' : ''; ?>"
-                    data-lang="<?php echo esc_attr( $code ); ?>">
-                    <?php echo esc_html( $lang['label'] ); ?>
-                    <?php if ( $lang['default'] ) : ?>
-                        <span style="font-size:10px;">(<?php esc_html_e( 'default', 'snel-seo' ); ?>)</span>
-                    <?php endif; ?>
-                    <?php if ( $dot_class ) : ?>
-                        <span class="snel-seo-dot <?php echo esc_attr( $dot_class ); ?>"></span>
-                    <?php endif; ?>
-                </button>
-            <?php endforeach; ?>
-
-            <button type="button" class="button snel-seo-translate-all" id="snel-seo-translate-all-btn">
-                &#10022; <span id="snel-seo-translate-all-label"><?php esc_html_e( 'Translate All', 'snel-seo' ); ?></span>
+        <!-- Tabs -->
+        <div class="snel-seo-tabs">
+            <button type="button" class="snel-seo-tab active" data-tab="preview">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <?php esc_html_e( 'Preview', 'snel-seo' ); ?>
             </button>
-            <span class="snel-seo-translate-status" id="snel-seo-translate-status"></span>
+            <button type="button" class="snel-seo-tab" data-tab="custom-seo">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/></svg>
+                <?php esc_html_e( 'Custom SEO', 'snel-seo' ); ?>
+            </button>
         </div>
-        <?php endif; ?>
 
-        <?php foreach ( $languages as $lang ) :
-            $code  = $lang['code'];
-            $title = isset( $seo_titles[ $code ] ) ? $seo_titles[ $code ] : '';
-            $desc  = isset( $seo_descs[ $code ] ) ? $seo_descs[ $code ] : '';
-            $is_active = ( $code === $default_lang );
-
-            $preview_title = ( $title ?: $post->post_title ) . ' ' . $separator . ' ' . $site_name;
-            $preview_desc  = $desc ?: '';
-
-            $url_parts = explode( '/', trim( wp_parse_url( $permalink, PHP_URL_PATH ) ?: '', '/' ) );
-            $url_path  = implode( ' › ', array_filter( $url_parts ) );
-        ?>
-        <div class="snel-seo-lang-panel <?php echo $is_active ? 'active' : ''; ?>" data-lang="<?php echo esc_attr( $code ); ?>" <?php echo $is_active ? '' : 'style="display:none;"'; ?>>
-
-            <div class="snel-seo-field">
-                <label>
-                    <?php esc_html_e( 'SEO Title', 'snel-seo' ); ?>
-                    <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
-                </label>
-                <p class="description" style="font-size:11px;color:#888;margin:2px 0 6px;">
-                    <?php esc_html_e( 'Replaces %%title%% in your title template.', 'snel-seo' ); ?>
-                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=snel-seo' ) ); ?>" target="_blank"><?php esc_html_e( 'Change template', 'snel-seo' ); ?></a>
-                </p>
-                <input type="text"
-                    name="snel_seo_title[<?php echo esc_attr( $code ); ?>]"
-                    value="<?php echo esc_attr( $title ); ?>"
-                    class="snel-seo-title-input large-text"
-                    data-lang="<?php echo esc_attr( $code ); ?>"
-                    placeholder="<?php echo esc_attr( $post->post_title ); ?>">
-            </div>
-
-            <div class="snel-seo-field">
-                <label>
-                    <?php esc_html_e( 'Meta Description', 'snel-seo' ); ?>
-                    <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
-                </label>
-                <p class="description" style="font-size:11px;color:#888;margin:2px 0 6px;">
-                    <?php esc_html_e( 'Overrides the auto-generated description for this page.', 'snel-seo' ); ?>
-                </p>
-                <textarea
-                    name="snel_seo_metadesc[<?php echo esc_attr( $code ); ?>]"
-                    rows="3"
-                    class="snel-seo-desc-input large-text"
-                    data-lang="<?php echo esc_attr( $code ); ?>"
-                    maxlength="320"
-                    placeholder="<?php esc_attr_e( 'Enter a meta description for search results...', 'snel-seo' ); ?>"><?php echo esc_textarea( $desc ); ?></textarea>
-                <div class="snel-seo-char-count" data-lang="<?php echo esc_attr( $code ); ?>">
-                    <span class="snel-seo-char-num"><?php echo mb_strlen( $desc ); ?></span> / 160
-                </div>
-            </div>
-
-            <!-- Google Preview -->
-            <div class="snel-seo-gp" data-lang="<?php echo esc_attr( $code ); ?>">
-                <div class="snel-seo-gp-header">
-                    <svg width="14" height="14" viewBox="0 0 48 48">
-                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                        <path fill="#34A853" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.77-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.52l7.97-5.93z"/>
-                        <path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.93C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
-                    <span class="snel-seo-gp-header-label"><?php esc_html_e( 'Google Preview', 'snel-seo' ); ?></span>
-                </div>
-                <div class="snel-seo-gp-favicon-row">
-                    <div class="snel-seo-gp-favicon">
-                        <?php if ( $favicon ) : ?>
-                            <img src="<?php echo esc_url( $favicon ); ?>" alt="">
-                        <?php else : ?>
-                            <div style="width:16px;height:16px;background:#ddd;border-radius:2px;"></div>
+        <!-- Preview Tab -->
+        <div class="snel-seo-tab-panel active" data-tab="preview">
+            <?php if ( $multilingual ) : ?>
+            <div class="snel-seo-lang-switcher" style="border-bottom:none;margin-bottom:8px;padding-bottom:0;">
+                <?php foreach ( $languages as $lang ) :
+                    $code = $lang['code'];
+                ?>
+                    <button type="button"
+                        class="snel-seo-lang-btn snel-seo-preview-lang-btn<?php echo $code === $default_lang ? ' active' : ''; ?>"
+                        data-lang="<?php echo esc_attr( $code ); ?>">
+                        <?php echo esc_html( $lang['label'] ); ?>
+                        <?php if ( $lang['default'] ) : ?>
+                            <span style="font-size:10px;">(<?php esc_html_e( 'default', 'snel-seo' ); ?>)</span>
                         <?php endif; ?>
-                    </div>
-                    <div>
-                        <div class="snel-seo-gp-domain"><?php echo esc_html( $domain ); ?></div>
-                        <?php if ( $url_path ) : ?>
-                            <div class="snel-seo-gp-path"><?php echo esc_html( $url_path ); ?></div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                <div class="snel-seo-gp-title"><?php echo esc_html( $preview_title ); ?></div>
-                <p class="snel-seo-gp-desc"><?php echo esc_html( $preview_desc ?: __( 'No meta description set. Google will auto-generate a snippet from your page content.', 'snel-seo' ) ); ?></p>
+                    </button>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <div class="snel-seo-info-box">
+                <?php esc_html_e( 'This preview shows how your product appears in Google. Title and description are generated from your SEO templates and product fields. Use the "Custom SEO" tab to override.', 'snel-seo' ); ?>
             </div>
 
+            <?php foreach ( $languages as $lang ) :
+                $code  = $lang['code'];
+                $title = isset( $seo_titles[ $code ] ) ? $seo_titles[ $code ] : '';
+                $desc  = isset( $seo_descs[ $code ] ) ? $seo_descs[ $code ] : '';
+                $is_active = ( $code === $default_lang );
 
+                $fallback_title = snel_seo_classic_get_fallback_title( $post, $code, $default_lang );
+                $preview_title = ( $title ?: $fallback_title ) . ' ' . $separator . ' ' . $site_name;
+                $preview_desc  = $desc ?: '';
+
+                $url_parts = explode( '/', trim( wp_parse_url( $permalink, PHP_URL_PATH ) ?: '', '/' ) );
+                $url_path  = implode( ' › ', array_filter( $url_parts ) );
+            ?>
+            <div class="snel-seo-lang-panel-preview <?php echo $is_active ? 'active' : ''; ?>" data-lang="<?php echo esc_attr( $code ); ?>" <?php echo $is_active ? '' : 'style="display:none;"'; ?>>
+                <div class="snel-seo-gp" data-lang="<?php echo esc_attr( $code ); ?>">
+                    <div class="snel-seo-gp-header">
+                        <svg width="14" height="14" viewBox="0 0 48 48">
+                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                            <path fill="#34A853" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.77-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.52l7.97-5.93z"/>
+                            <path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.93C6.51 42.62 14.62 48 24 48z"/>
+                        </svg>
+                        <span class="snel-seo-gp-header-label"><?php esc_html_e( 'Google Preview', 'snel-seo' ); ?></span>
+                    </div>
+                    <div class="snel-seo-gp-favicon-row">
+                        <div class="snel-seo-gp-favicon">
+                            <?php if ( $favicon ) : ?>
+                                <img src="<?php echo esc_url( $favicon ); ?>" alt="">
+                            <?php else : ?>
+                                <div style="width:16px;height:16px;background:#ddd;border-radius:2px;"></div>
+                            <?php endif; ?>
+                        </div>
+                        <div>
+                            <div class="snel-seo-gp-domain"><?php echo esc_html( $domain ); ?></div>
+                            <?php if ( $url_path ) : ?>
+                                <div class="snel-seo-gp-path"><?php echo esc_html( $url_path ); ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="snel-seo-gp-title"><?php echo esc_html( $preview_title ); ?></div>
+                    <p class="snel-seo-gp-desc"><?php echo esc_html( $preview_desc ?: __( 'Auto-generated from your product description fields and templates.', 'snel-seo' ) ); ?></p>
+                </div>
+            </div>
+            <?php endforeach; ?>
         </div>
-        <?php endforeach; ?>
+
+        <!-- Custom SEO Tab -->
+        <div class="snel-seo-tab-panel" data-tab="custom-seo">
+            <div class="snel-seo-info-box amber">
+                <?php esc_html_e( 'These fields are optional overrides. If left empty, your SEO templates and product fields will be used automatically.', 'snel-seo' ); ?>
+            </div>
+
+            <?php if ( $multilingual ) : ?>
+            <div class="snel-seo-lang-switcher">
+                <?php foreach ( $languages as $lang ) :
+                    $code = $lang['code'];
+                    $has_title = ! empty( $seo_titles[ $code ] );
+                    $has_desc  = ! empty( $seo_descs[ $code ] );
+                    $dot_class = '';
+                    if ( ! $lang['default'] ) {
+                        if ( $has_title && $has_desc ) $dot_class = 'snel-seo-dot-green';
+                        elseif ( $has_title || $has_desc ) $dot_class = 'snel-seo-dot-amber';
+                        else $dot_class = 'snel-seo-dot-gray';
+                    }
+                ?>
+                    <button type="button"
+                        class="snel-seo-lang-btn<?php echo $code === $default_lang ? ' active' : ''; ?>"
+                        data-lang="<?php echo esc_attr( $code ); ?>">
+                        <?php echo esc_html( $lang['label'] ); ?>
+                        <?php if ( $lang['default'] ) : ?>
+                            <span style="font-size:10px;">(<?php esc_html_e( 'default', 'snel-seo' ); ?>)</span>
+                        <?php endif; ?>
+                        <?php if ( $dot_class ) : ?>
+                            <span class="snel-seo-dot <?php echo esc_attr( $dot_class ); ?>"></span>
+                        <?php endif; ?>
+                    </button>
+                <?php endforeach; ?>
+
+                <button type="button" class="button snel-seo-translate-all" id="snel-seo-translate-all-btn">
+                    &#10022; <span id="snel-seo-translate-all-label"><?php esc_html_e( 'Translate All', 'snel-seo' ); ?></span>
+                </button>
+                <span class="snel-seo-translate-status" id="snel-seo-translate-status"></span>
+            </div>
+            <?php endif; ?>
+
+            <?php foreach ( $languages as $lang ) :
+                $code  = $lang['code'];
+                $title = isset( $seo_titles[ $code ] ) ? $seo_titles[ $code ] : '';
+                $desc  = isset( $seo_descs[ $code ] ) ? $seo_descs[ $code ] : '';
+                $is_active = ( $code === $default_lang );
+
+                $preview_title = ( $title ?: $post->post_title ) . ' ' . $separator . ' ' . $site_name;
+            ?>
+            <div class="snel-seo-lang-panel <?php echo $is_active ? 'active' : ''; ?>" data-lang="<?php echo esc_attr( $code ); ?>" <?php echo $is_active ? '' : 'style="display:none;"'; ?>>
+
+                <div class="snel-seo-field">
+                    <label>
+                        <?php esc_html_e( 'SEO Title Override', 'snel-seo' ); ?>
+                        <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
+                    </label>
+                    <p class="description" style="font-size:11px;color:#888;margin:2px 0 6px;">
+                        <?php esc_html_e( 'Leave empty to use the template.', 'snel-seo' ); ?>
+                        <a href="<?php echo esc_url( admin_url( 'admin.php?page=snel-seo' ) ); ?>" target="_blank"><?php esc_html_e( 'Change template', 'snel-seo' ); ?></a>
+                    </p>
+                    <input type="text"
+                        name="snel_seo_title[<?php echo esc_attr( $code ); ?>]"
+                        value="<?php echo esc_attr( $title ); ?>"
+                        class="snel-seo-title-input large-text"
+                        data-lang="<?php echo esc_attr( $code ); ?>"
+                        placeholder="<?php echo esc_attr( $post->post_title ); ?>">
+                </div>
+
+                <div class="snel-seo-field">
+                    <label>
+                        <?php esc_html_e( 'Meta Description Override', 'snel-seo' ); ?>
+                        <?php if ( $multilingual ) echo '(' . strtoupper( $code ) . ')'; ?>
+                    </label>
+                    <p class="description" style="font-size:11px;color:#888;margin:2px 0 6px;">
+                        <?php esc_html_e( 'Leave empty to use product fields and templates.', 'snel-seo' ); ?>
+                    </p>
+                    <textarea
+                        name="snel_seo_metadesc[<?php echo esc_attr( $code ); ?>]"
+                        rows="3"
+                        class="snel-seo-desc-input large-text"
+                        data-lang="<?php echo esc_attr( $code ); ?>"
+                        maxlength="320"
+                        placeholder="<?php esc_attr_e( 'Only fill this in to override the auto-generated description...', 'snel-seo' ); ?>"><?php echo esc_textarea( $desc ); ?></textarea>
+                    <div class="snel-seo-char-count" data-lang="<?php echo esc_attr( $code ); ?>">
+                        <span class="snel-seo-char-num"><?php echo mb_strlen( $desc ); ?></span> / 160
+                    </div>
+                </div>
+
+                <!-- Live Google Preview in Custom SEO tab -->
+                <div class="snel-seo-gp" data-lang="<?php echo esc_attr( $code ); ?>">
+                    <div class="snel-seo-gp-header">
+                        <svg width="14" height="14" viewBox="0 0 48 48">
+                            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                            <path fill="#34A853" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.77-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.9 7.35 2.56 10.52l7.97-5.93z"/>
+                            <path fill="#FBBC05" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.93C6.51 42.62 14.62 48 24 48z"/>
+                        </svg>
+                        <span class="snel-seo-gp-header-label"><?php esc_html_e( 'Google Preview', 'snel-seo' ); ?></span>
+                    </div>
+                    <div class="snel-seo-gp-favicon-row">
+                        <div class="snel-seo-gp-favicon">
+                            <?php if ( $favicon ) : ?>
+                                <img src="<?php echo esc_url( $favicon ); ?>" alt="">
+                            <?php else : ?>
+                                <div style="width:16px;height:16px;background:#ddd;border-radius:2px;"></div>
+                            <?php endif; ?>
+                        </div>
+                        <div>
+                            <div class="snel-seo-gp-domain"><?php echo esc_html( $domain ); ?></div>
+                        </div>
+                    </div>
+                    <div class="snel-seo-gp-title"><?php echo esc_html( $preview_title ); ?></div>
+                    <p class="snel-seo-gp-desc"><?php echo esc_html( $desc ?: __( 'No override set — using auto-generated description.', 'snel-seo' ) ); ?></p>
+                </div>
+
+            </div>
+            <?php endforeach; ?>
+        </div>
     </div>
 
     <script>
@@ -279,9 +369,42 @@ function snel_seo_classic_metabox_render( $post ) {
             });
         }
 
-        // Language switcher.
-        var langBtns = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-btn');
+        // Tab switching.
+        var tabBtns = document.querySelectorAll('.snel-seo-classic .snel-seo-tab');
+        var tabPanels = document.querySelectorAll('.snel-seo-classic .snel-seo-tab-panel');
+        tabBtns.forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var tab = this.dataset.tab;
+                tabBtns.forEach(function(b) { b.classList.remove('active'); });
+                this.classList.add('active');
+                tabPanels.forEach(function(p) {
+                    if (p.dataset.tab === tab) {
+                        p.classList.add('active');
+                    } else {
+                        p.classList.remove('active');
+                    }
+                });
+                // Sync language panels in the newly visible tab.
+                syncLangPanels();
+            });
+        });
+
+        // Language switcher — all lang buttons across both tabs.
+        var allLangBtns = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-btn');
+        var langBtns = allLangBtns;
         var langPanels = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-panel');
+        var langPanelsPreview = document.querySelectorAll('.snel-seo-classic .snel-seo-lang-panel-preview');
+
+        function syncLangPanels() {
+            // Sync both custom SEO and preview panels to currentLang.
+            langPanels.forEach(function(p) {
+                p.style.display = p.dataset.lang === currentLang ? '' : 'none';
+            });
+            langPanelsPreview.forEach(function(p) {
+                p.style.display = p.dataset.lang === currentLang ? '' : 'none';
+            });
+        }
 
         function updateTranslateLabel() {
             var label = document.getElementById('snel-seo-translate-all-label');
@@ -293,21 +416,16 @@ function snel_seo_classic_metabox_render( $post ) {
             }
         }
 
-        langBtns.forEach(function(btn) {
+        allLangBtns.forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 currentLang = this.dataset.lang;
-                langBtns.forEach(function(b) { b.classList.remove('active'); });
-                this.classList.add('active');
-                langPanels.forEach(function(p) {
-                    if (p.dataset.lang === currentLang) {
-                        p.style.display = '';
-                        p.classList.add('active');
-                    } else {
-                        p.style.display = 'none';
-                        p.classList.remove('active');
-                    }
+                // Sync active state across all lang buttons in both tabs.
+                allLangBtns.forEach(function(b) {
+                    if (b.dataset.lang === currentLang) b.classList.add('active');
+                    else b.classList.remove('active');
                 });
+                syncLangPanels();
                 updateTranslateLabel();
             });
         });
