@@ -1,6 +1,6 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database, Tags } from 'lucide-react';
+import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database, Tags, Info } from 'lucide-react';
 import SCHEMA_TYPES from '../schema-types';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from '../components/TemplateInput';
@@ -1057,6 +1057,18 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                             </div>
                         ) }
 
+                        <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700">
+                            <Info size={ 16 } className="shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <p>
+                                    <code className="bg-blue-100 px-1 py-0.5 rounded text-[11px]">%%term_title%%</code> { __( 'and', 'snel-seo' ) } <code className="bg-blue-100 px-1 py-0.5 rounded text-[11px]">%%term_description%%</code> { __( 'are pulled from the Name and Description fields on the category edit screen in WordPress.', 'snel-seo' ) }
+                                </p>
+                                <p className="text-blue-500">
+                                    { __( 'If a category has its own description filled in, that takes priority over the meta description template below.', 'snel-seo' ) }
+                                </p>
+                            </div>
+                        </div>
+
                         {/* Title template */ }
                         <TemplateInput
                             label={ __( 'SEO Title Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
@@ -1109,17 +1121,6 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                             description={ resolveTemplate( getTaxVal( 'metadesc_template' ) || '%%term_title%% %%separator%% %%term_description%%', { ...previewVars, term_title: currentTax?.label || '', term_description: __( 'Category description here', 'snel-seo' ) } ) }
                         />
 
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
-                            <p>
-                                <strong>{ __( 'Where do these variables come from?', 'snel-seo' ) }</strong>
-                            </p>
-                            <p>
-                                <code className="bg-blue-100 px-1 py-0.5 rounded text-[11px]">%%term_title%%</code> { __( 'and', 'snel-seo' ) } <code className="bg-blue-100 px-1 py-0.5 rounded text-[11px]">%%term_description%%</code> { __( 'are pulled from the Name and Description fields on the category edit screen in WordPress.', 'snel-seo' ) }
-                            </p>
-                            <p className="text-blue-500">
-                                { __( 'If a category has its own description filled in, that takes priority over the meta description template above.', 'snel-seo' ) }
-                            </p>
-                        </div>
                     </>
                 ) }
 
