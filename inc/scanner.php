@@ -20,7 +20,8 @@ function snel_seo_scanner_create_table() {
 
     $sql = "CREATE TABLE IF NOT EXISTS $table (
         id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-        post_id bigint(20) UNSIGNED NOT NULL,
+        object_type varchar(20) NOT NULL DEFAULT 'post',
+        object_id bigint(20) UNSIGNED NOT NULL,
         lang varchar(5) NOT NULL DEFAULT 'nl',
         url text NOT NULL,
         content_hash varchar(32) DEFAULT NULL,
@@ -29,7 +30,7 @@ function snel_seo_scanner_create_table() {
         ai_summary text,
         scanned_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
-        KEY post_lang (post_id, lang),
+        KEY object_lookup (object_type, object_id, lang),
         KEY scanned_at (scanned_at)
     ) $charset;";
 
@@ -41,12 +42,36 @@ register_activation_hook( SNEL_SEO_PLUGIN_DIR . 'snel-seo.php', 'snel_seo_scanne
 // Run dbDelta on admin_init to create or update the table schema.
 add_action( 'admin_init', function () {
     $version_key = 'snel_seo_scans_db_version';
-    $current     = '1.1'; // Bump when schema changes.
+    $current     = '2.0'; // Bump when schema changes.
     if ( get_option( $version_key ) !== $current ) {
         snel_seo_scanner_create_table();
+        // Migrate old post_id column to object_id if upgrading.
+        snel_seo_scanner_migrate_columns();
         update_option( $version_key, $current );
     }
 } );
+
+/**
+ * Migrate old post_id column to object_id + object_type.
+ */
+function snel_seo_scanner_migrate_columns() {
+    global $wpdb;
+    $table = $wpdb->prefix . 'snel_seo_scans';
+
+    // Check if old post_id column exists.
+    $columns = $wpdb->get_col( "SHOW COLUMNS FROM $table", 0 );
+    if ( in_array( 'post_id', $columns, true ) && ! in_array( 'object_id', $columns, true ) ) {
+        $wpdb->query( "ALTER TABLE $table CHANGE COLUMN post_id object_id bigint(20) UNSIGNED NOT NULL" );
+    }
+    if ( ! in_array( 'object_type', $columns, true ) ) {
+        $wpdb->query( "ALTER TABLE $table ADD COLUMN object_type varchar(20) NOT NULL DEFAULT 'post' AFTER id" );
+    }
+    // Drop old index if exists.
+    $indexes = $wpdb->get_results( "SHOW INDEX FROM $table WHERE Key_name = 'post_lang'" );
+    if ( ! empty( $indexes ) ) {
+        $wpdb->query( "ALTER TABLE $table DROP INDEX post_lang" );
+    }
+}
 
 /**
  * Extract SEO elements from rendered HTML.
@@ -87,7 +112,6 @@ function snel_seo_extract_from_html( $html ) {
     }
 
     // Body text (first 500 chars of main content area, excluding nav/footer).
-    // Try common main content selectors, fall back to <body>.
     $content_html = '';
     if ( preg_match( '/<main[^>]*>(.*?)<\/main>/is', $html, $m ) ) {
         $content_html = $m[1];
@@ -229,10 +253,120 @@ function snel_seo_check_schema() {
 }
 
 /**
- * REST endpoint: scan a batch of pages.
+ * Scan a single URL.
+ *
+ * Core reusable function: fetch → extract → hash check → AI analyze → store.
+ *
+ * @param string $url         The full URL to scan.
+ * @param string $lang        Language code.
+ * @param string $object_type 'post' or 'term'.
+ * @param int    $object_id   Post ID or Term ID.
+ * @return array Result with score, summary, etc. or error key.
+ */
+function snel_seo_scan_url( $url, $lang, $object_type, $object_id ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'snel_seo_scans';
+
+    // Fetch the rendered page.
+    $response = wp_remote_get( $url, array(
+        'timeout'   => 15,
+        'sslverify' => false,
+    ) );
+
+    if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+        return array(
+            'object_type' => $object_type,
+            'object_id'   => $object_id,
+            'lang'        => $lang,
+            'url'         => $url,
+            'error'       => is_wp_error( $response ) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
+        );
+    }
+
+    $html      = wp_remote_retrieve_body( $response );
+    $extracted = snel_seo_extract_from_html( $html );
+
+    // Hash the extracted content to detect changes.
+    $hash = md5( wp_json_encode( $extracted ) );
+
+    // Check if content hasn't changed since last scan.
+    $existing = $wpdb->get_row( $wpdb->prepare(
+        "SELECT content_hash, checks, score, ai_summary FROM $table WHERE object_type = %s AND object_id = %d AND lang = %s",
+        $object_type, $object_id, $lang
+    ) );
+
+    if ( $existing && $existing->content_hash === $hash ) {
+        return array(
+            'object_type' => $object_type,
+            'object_id'   => $object_id,
+            'lang'        => $lang,
+            'url'         => $url,
+            'score'       => (int) $existing->score,
+            'checks'      => json_decode( $existing->checks, true ) ?: array(),
+            'ai_summary'  => $existing->ai_summary,
+            'summary'     => $existing->ai_summary,
+            'skipped'     => true,
+        );
+    }
+
+    // Content changed or first scan — call AI.
+    $analysis = snel_seo_scanner_analyze( $url, $lang, $extracted );
+
+    if ( is_wp_error( $analysis ) ) {
+        return array(
+            'object_type' => $object_type,
+            'object_id'   => $object_id,
+            'lang'        => $lang,
+            'url'         => $url,
+            'error'       => $analysis->get_error_message(),
+        );
+    }
+
+    // Delete previous scan for this object+lang.
+    $wpdb->delete( $table, array( 'object_type' => $object_type, 'object_id' => $object_id, 'lang' => $lang ) );
+
+    // Insert new result.
+    $wpdb->insert( $table, array(
+        'object_type'  => $object_type,
+        'object_id'    => $object_id,
+        'lang'         => $lang,
+        'url'          => $url,
+        'content_hash' => $hash,
+        'checks'       => wp_json_encode( $analysis['checks'] ?? array() ),
+        'score'        => (int) ( $analysis['score'] ?? 0 ),
+        'ai_summary'   => $analysis['summary'] ?? '',
+        'scanned_at'   => current_time( 'mysql' ),
+    ) );
+
+    return array(
+        'object_type' => $object_type,
+        'object_id'   => $object_id,
+        'lang'        => $lang,
+        'url'         => $url,
+        'score'       => $analysis['score'] ?? 0,
+        'checks'      => $analysis['checks'] ?? array(),
+        'ai_summary'  => $analysis['summary'] ?? '',
+        'summary'     => $analysis['summary'] ?? '',
+    );
+}
+
+/**
+ * Build a language-specific URL from a base permalink.
+ */
+function snel_seo_build_lang_url( $permalink, $lang ) {
+    $default_lang = snel_seo_get_default_lang();
+    if ( $lang === $default_lang ) {
+        return $permalink;
+    }
+    $path = wp_parse_url( $permalink, PHP_URL_PATH );
+    return home_url( '/' . $lang . $path );
+}
+
+/**
+ * REST endpoints.
  */
 add_action( 'rest_api_init', function () {
-    // Scan a batch of post IDs.
+    // Scan a batch of posts and/or terms.
     register_rest_route( SnelSeoConfig::$rest_namespace, '/scanner/batch', array(
         'methods'             => 'POST',
         'callback'            => 'snel_seo_scanner_batch',
@@ -253,7 +387,7 @@ add_action( 'rest_api_init', function () {
         'permission_callback' => function () { return current_user_can( 'manage_options' ); },
     ) );
 
-    // Get scannable post IDs (for batch queue).
+    // Get scannable queue (posts + terms).
     register_rest_route( SnelSeoConfig::$rest_namespace, '/scanner/queue', array(
         'methods'             => 'GET',
         'callback'            => 'snel_seo_scanner_queue',
@@ -262,7 +396,7 @@ add_action( 'rest_api_init', function () {
 } );
 
 /**
- * Get all scannable post IDs.
+ * Get all scannable items (posts + terms).
  */
 function snel_seo_scanner_queue( WP_REST_Request $request ) {
     $post_types = get_post_types( array( 'public' => true ), 'names' );
@@ -275,6 +409,18 @@ function snel_seo_scanner_queue( WP_REST_Request $request ) {
         'fields'         => 'ids',
     ) );
 
+    // Get public taxonomy terms.
+    $taxonomies = get_taxonomies( array( 'public' => true ), 'names' );
+    $exclude_tax = array( 'category', 'post_tag', 'post_format' );
+    $term_ids = array();
+    foreach ( $taxonomies as $tax ) {
+        if ( in_array( $tax, $exclude_tax, true ) ) continue;
+        $terms = get_terms( array( 'taxonomy' => $tax, 'hide_empty' => false, 'fields' => 'ids' ) );
+        if ( ! is_wp_error( $terms ) ) {
+            $term_ids = array_merge( $term_ids, $terms );
+        }
+    }
+
     // Get supported languages.
     $languages = array( snel_seo_get_default_lang() );
     if ( has_filter( 'snel_seo_languages' ) ) {
@@ -284,29 +430,28 @@ function snel_seo_scanner_queue( WP_REST_Request $request ) {
 
     return rest_ensure_response( array(
         'post_ids'  => $posts,
+        'term_ids'  => array_values( array_unique( $term_ids ) ),
         'languages' => $languages,
-        'total'     => count( $posts ) * count( $languages ),
+        'total'     => ( count( $posts ) + count( $term_ids ) ) * count( $languages ),
     ) );
 }
 
 /**
- * Scan a batch of pages.
+ * Scan a batch of pages (posts and/or terms).
  */
 function snel_seo_scanner_batch( WP_REST_Request $request ) {
-    global $wpdb;
-    $table = $wpdb->prefix . 'snel_seo_scans';
-
     $params   = $request->get_json_params();
     $post_ids = $params['post_ids'] ?? array();
+    $term_ids = $params['term_ids'] ?? array();
     $langs    = $params['languages'] ?? array( snel_seo_get_default_lang() );
 
-    if ( empty( $post_ids ) ) {
-        return new WP_Error( 'no_posts', 'No post IDs provided.', array( 'status' => 400 ) );
+    if ( empty( $post_ids ) && empty( $term_ids ) ) {
+        return new WP_Error( 'no_items', 'No post or term IDs provided.', array( 'status' => 400 ) );
     }
 
-    $results   = array();
-    $site_url  = home_url();
+    $results = array();
 
+    // Scan posts.
     foreach ( $post_ids as $post_id ) {
         $post = get_post( (int) $post_id );
         if ( ! $post ) continue;
@@ -314,92 +459,27 @@ function snel_seo_scanner_batch( WP_REST_Request $request ) {
         $permalink = get_permalink( $post_id );
 
         foreach ( $langs as $lang ) {
-            // Build the language-specific URL.
-            $default_lang = snel_seo_get_default_lang();
-            if ( $lang === $default_lang ) {
-                $url = $permalink;
-            } else {
-                // Add language prefix.
-                $path = wp_parse_url( $permalink, PHP_URL_PATH );
-                $url  = $site_url . '/' . $lang . $path;
-            }
+            $url    = snel_seo_build_lang_url( $permalink, $lang );
+            $result = snel_seo_scan_url( $url, $lang, 'post', (int) $post_id );
+            // Add backward-compat post_id key.
+            $result['post_id'] = (int) $post_id;
+            $results[] = $result;
+        }
+    }
 
-            // Fetch the rendered page.
-            $response = wp_remote_get( $url, array(
-                'timeout'   => 15,
-                'sslverify' => false,
-            ) );
+    // Scan terms.
+    foreach ( $term_ids as $term_id ) {
+        $term = get_term( (int) $term_id );
+        if ( ! $term || is_wp_error( $term ) ) continue;
 
-            if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
-                $results[] = array(
-                    'post_id' => $post_id,
-                    'lang'    => $lang,
-                    'url'     => $url,
-                    'error'   => is_wp_error( $response ) ? $response->get_error_message() : 'HTTP ' . wp_remote_retrieve_response_code( $response ),
-                );
-                continue;
-            }
+        $permalink = get_term_link( $term );
+        if ( is_wp_error( $permalink ) ) continue;
 
-            $html      = wp_remote_retrieve_body( $response );
-            $extracted = snel_seo_extract_from_html( $html );
-
-            // Hash the extracted content to detect changes.
-            $hash = md5( wp_json_encode( $extracted ) );
-
-            // Check if content hasn't changed since last scan.
-            $existing = $wpdb->get_row( $wpdb->prepare(
-                "SELECT content_hash, checks, score, ai_summary FROM $table WHERE post_id = %d AND lang = %s",
-                $post_id, $lang
-            ) );
-
-            if ( $existing && $existing->content_hash === $hash ) {
-                // Content unchanged — skip AI, keep existing result.
-                $results[] = array(
-                    'post_id' => $post_id,
-                    'lang'    => $lang,
-                    'url'     => $url,
-                    'score'   => (int) $existing->score,
-                    'summary' => $existing->ai_summary,
-                    'skipped' => true,
-                );
-                continue;
-            }
-
-            // Content changed or first scan — call AI.
-            $analysis = snel_seo_scanner_analyze( $url, $lang, $extracted );
-
-            if ( is_wp_error( $analysis ) ) {
-                $results[] = array(
-                    'post_id' => $post_id,
-                    'lang'    => $lang,
-                    'url'     => $url,
-                    'error'   => $analysis->get_error_message(),
-                );
-                continue;
-            }
-
-            // Delete previous scan for this post+lang.
-            $wpdb->delete( $table, array( 'post_id' => $post_id, 'lang' => $lang ) );
-
-            // Insert new result.
-            $wpdb->insert( $table, array(
-                'post_id'      => $post_id,
-                'lang'         => $lang,
-                'url'          => $url,
-                'content_hash' => $hash,
-                'checks'       => wp_json_encode( $analysis['checks'] ?? array() ),
-                'score'        => (int) ( $analysis['score'] ?? 0 ),
-                'ai_summary'   => $analysis['summary'] ?? '',
-                'scanned_at'   => current_time( 'mysql' ),
-            ) );
-
-            $results[] = array(
-                'post_id' => $post_id,
-                'lang'    => $lang,
-                'url'     => $url,
-                'score'   => $analysis['score'] ?? 0,
-                'summary' => $analysis['summary'] ?? '',
-            );
+        foreach ( $langs as $lang ) {
+            $url    = snel_seo_build_lang_url( $permalink, $lang );
+            $result = snel_seo_scan_url( $url, $lang, 'term', (int) $term_id );
+            $result['term_id'] = (int) $term_id;
+            $results[] = $result;
         }
     }
 
@@ -413,19 +493,30 @@ function snel_seo_scanner_results( WP_REST_Request $request ) {
     global $wpdb;
     $table = $wpdb->prefix . 'snel_seo_scans';
 
-    $page     = max( 1, (int) $request->get_param( 'page' ) ?: 1 );
-    $per_page = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ?: 20 ) );
-    $lang     = sanitize_text_field( $request->get_param( 'lang' ) ?: '' );
-    $status   = sanitize_text_field( $request->get_param( 'status' ) ?: '' );
-    $post_id  = (int) $request->get_param( 'post_id' );
-    $offset   = ( $page - 1 ) * $per_page;
+    $page        = max( 1, (int) $request->get_param( 'page' ) ?: 1 );
+    $per_page    = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ?: 20 ) );
+    $lang        = sanitize_text_field( $request->get_param( 'lang' ) ?: '' );
+    $status      = sanitize_text_field( $request->get_param( 'status' ) ?: '' );
+    $object_type = sanitize_text_field( $request->get_param( 'object_type' ) ?: '' );
+    $object_id   = (int) $request->get_param( 'object_id' );
+    // Backward compat: accept post_id param.
+    if ( ! $object_id ) {
+        $object_id = (int) $request->get_param( 'post_id' );
+        if ( $object_id && ! $object_type ) $object_type = 'post';
+    }
+    $offset = ( $page - 1 ) * $per_page;
 
     $where = '1=1';
     $args  = array();
 
-    if ( $post_id ) {
-        $where .= ' AND post_id = %d';
-        $args[] = $post_id;
+    if ( $object_type ) {
+        $where .= ' AND object_type = %s';
+        $args[] = $object_type;
+    }
+
+    if ( $object_id ) {
+        $where .= ' AND object_id = %d';
+        $args[] = $object_id;
     }
 
     if ( $lang ) {
@@ -447,10 +538,17 @@ function snel_seo_scanner_results( WP_REST_Request $request ) {
         ...$query_args
     ) );
 
-    // Decode checks JSON.
+    // Decode checks JSON and add title.
     foreach ( $rows as &$row ) {
         $row->checks = json_decode( $row->checks, true );
-        $row->post_title = get_the_title( $row->post_id );
+        if ( $row->object_type === 'term' ) {
+            $term = get_term( $row->object_id );
+            $row->post_title = $term && ! is_wp_error( $term ) ? $term->name : 'Term #' . $row->object_id;
+        } else {
+            $row->post_title = get_the_title( $row->object_id );
+        }
+        // Backward compat.
+        $row->post_id = $row->object_id;
     }
 
     return rest_ensure_response( array(

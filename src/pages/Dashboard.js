@@ -136,18 +136,20 @@ function ScannerCard() {
 
         const queue = await api( '/scanner/queue' );
         const postIds = queue.post_ids || [];
+        const termIds = queue.term_ids || [];
         const allLangs = queue.languages || [ 'nl' ];
         const languages = scanLang ? [ scanLang ] : allLangs;
-        const total = postIds.length * languages.length;
+        const total = ( postIds.length + termIds.length ) * languages.length;
         setProgress( { done: 0, total } );
 
         await animateStatus( '✦ Loading scan queue...' );
 
         let done = 0;
+
+        // Scan posts.
         for ( const postId of postIds ) {
             for ( const lang of languages ) {
-                const postTitle = `Post #${ postId }`;
-                await animateStatus( `⟳ Fetching ${ lang.toUpperCase() } page...` );
+                await animateStatus( `⟳ Fetching ${ lang.toUpperCase() } post #${ postId }...` );
 
                 const data = await api( '/scanner/batch', {
                     method: 'POST',
@@ -164,7 +166,32 @@ function ScannerCard() {
                     await animateStatus( `✗ ${ lang.toUpperCase() } — ${ result.error }` );
                 } else if ( result ) {
                     await animateStatus( `✓ ${ lang.toUpperCase() } — Score: ${ result.score }` );
-                    setRecentScans( ( prev ) => [ { ...result, post_title: postTitle }, ...prev ].slice( 0, 5 ) );
+                    setRecentScans( ( prev ) => [ { ...result, post_title: `Post #${ postId }` }, ...prev ].slice( 0, 5 ) );
+                }
+            }
+        }
+
+        // Scan terms.
+        for ( const termId of termIds ) {
+            for ( const lang of languages ) {
+                await animateStatus( `⟳ Fetching ${ lang.toUpperCase() } term #${ termId }...` );
+
+                const data = await api( '/scanner/batch', {
+                    method: 'POST',
+                    body: JSON.stringify( { term_ids: [ termId ], languages: [ lang ] } ),
+                } );
+
+                const result = data.results?.[ 0 ];
+                done++;
+                setProgress( { done, total } );
+
+                if ( result?.skipped ) {
+                    await animateStatus( `↳ ${ lang.toUpperCase() } unchanged — skipped ✓` );
+                } else if ( result?.error ) {
+                    await animateStatus( `✗ ${ lang.toUpperCase() } — ${ result.error }` );
+                } else if ( result ) {
+                    await animateStatus( `✓ ${ lang.toUpperCase() } — Score: ${ result.score }` );
+                    setRecentScans( ( prev ) => [ { ...result, post_title: `Term #${ termId }` }, ...prev ].slice( 0, 5 ) );
                 }
             }
         }

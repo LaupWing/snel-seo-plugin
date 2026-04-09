@@ -43,11 +43,16 @@ add_action( 'wp_footer', function () {
         return;
     }
 
-    // Get current post/page info if available.
-    $post_id = 0;
-    $lang    = snel_seo_get_current_lang();
+    // Get current object info.
+    $object_type = '';
+    $object_id   = 0;
+    $lang        = snel_seo_get_current_lang();
     if ( is_singular() ) {
-        $post_id = get_queried_object_id();
+        $object_type = 'post';
+        $object_id   = get_queried_object_id();
+    } elseif ( is_tax() || is_category() || is_tag() ) {
+        $object_type = 'term';
+        $object_id   = get_queried_object_id();
     }
     ?>
     <style>
@@ -115,6 +120,7 @@ add_action( 'wp_footer', function () {
         .snel-seo-pop-score-circle {
             width: 48px;
             height: 48px;
+            min-width: 48px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -124,6 +130,7 @@ add_action( 'wp_footer', function () {
             background: #f3f4f6;
             color: #9ca3af;
             transition: all 0.3s;
+            flex-shrink: 0;
         }
         .snel-seo-pop-score-circle.good { background: #ecfdf5; color: #059669; }
         .snel-seo-pop-score-circle.warning { background: #fffbeb; color: #d97706; }
@@ -316,7 +323,8 @@ add_action( 'wp_footer', function () {
 
     <script>
     (function() {
-        var postId = <?php echo (int) $post_id; ?>;
+        var objectType = <?php echo wp_json_encode( $object_type ); ?>;
+        var objectId = <?php echo (int) $object_id; ?>;
         var lang = <?php echo wp_json_encode( $lang ); ?>;
         var restUrl = <?php echo wp_json_encode( rest_url( SnelSeoConfig::$rest_namespace ) ); ?>;
         var nonce = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
@@ -415,7 +423,7 @@ add_action( 'wp_footer', function () {
             }
         });
 
-        if (!postId) {
+        if (!objectId || !objectType) {
             scanBtn.disabled = true;
             scanBtnText.textContent = 'Not a scannable page';
             return;
@@ -441,10 +449,14 @@ add_action( 'wp_footer', function () {
 
             setStatus('⟳ Fetching ' + lang.toUpperCase() + ' page...', 'scanning');
 
+            var batchBody = { languages: [lang] };
+            if (objectType === 'term') { batchBody.term_ids = [objectId]; }
+            else { batchBody.post_ids = [objectId]; }
+
             fetch(restUrl + '/scanner/batch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
-                body: JSON.stringify({ post_ids: [postId], languages: [lang] })
+                body: JSON.stringify(batchBody)
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -471,23 +483,10 @@ add_action( 'wp_footer', function () {
                     setStatus('✓ Scan complete!', 'done');
                 }
 
-                // Fetch the full result with checks from the results endpoint.
-                fetch(restUrl + '/scanner/results?' + new URLSearchParams({ page: 1, per_page: 1, post_id: postId, lang: lang }), {
-                    headers: { 'X-WP-Nonce': nonce }
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(rData) {
-                    var fullResult = rData.results && rData.results[0];
-                    if (fullResult) {
-                        showResult(fullResult);
-                    } else {
-                        // Use the batch result (partial data).
-                        showResult(result);
-                    }
-                    scanBtn.disabled = false;
-                    scanBtn.classList.remove('scanning');
-                    scanBtnText.textContent = 'Re-scan';
-                });
+                showResult(result);
+                scanBtn.disabled = false;
+                scanBtn.classList.remove('scanning');
+                scanBtnText.textContent = 'Re-scan';
             })
             .catch(function(err) {
                 setStatus('✗ Network error', 'error');
@@ -498,7 +497,7 @@ add_action( 'wp_footer', function () {
         });
 
         // On load, check if there's an existing scan result for this page.
-        fetch(restUrl + '/scanner/results?' + new URLSearchParams({ page: 1, per_page: 1, post_id: postId, lang: lang }), {
+        fetch(restUrl + '/scanner/results?' + new URLSearchParams({ page: 1, per_page: 1, object_type: objectType, object_id: objectId, lang: lang }), {
             headers: { 'X-WP-Nonce': nonce }
         })
         .then(function(r) { return r.json(); })
