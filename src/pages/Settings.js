@@ -1109,9 +1109,17 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                             description={ resolveTemplate( getTaxVal( 'metadesc_template' ) || '%%term_title%% %%separator%% %%term_description%%', { ...previewVars, term_title: currentTax?.label || '', term_description: __( 'Category description here', 'snel-seo' ) } ) }
                         />
 
-                        <p className="text-xs text-gray-400">
-                            { __( 'Note: If a category has its own description filled in, that takes priority over this template.', 'snel-seo' ) }
-                        </p>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700 space-y-1">
+                            <p>
+                                <strong>{ __( 'Where do these variables come from?', 'snel-seo' ) }</strong>
+                            </p>
+                            <p>
+                                <code className="bg-blue-100 px-1 py-0.5 rounded text-[11px]">%%term_title%%</code> { __( 'and', 'snel-seo' ) } <code className="bg-blue-100 px-1 py-0.5 rounded text-[11px]">%%term_description%%</code> { __( 'are pulled from the Name and Description fields on the category edit screen in WordPress.', 'snel-seo' ) }
+                            </p>
+                            <p className="text-blue-500">
+                                { __( 'If a category has its own description filled in, that takes priority over the meta description template above.', 'snel-seo' ) }
+                            </p>
+                        </div>
                     </>
                 ) }
 
