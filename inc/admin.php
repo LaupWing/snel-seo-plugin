@@ -552,7 +552,7 @@ function snel_seo_taxonomy_metabox( $term, $taxonomy ) {
     wp_nonce_field( 'snel_seo_tax_metabox', 'snel_seo_tax_nonce' );
     ?>
 
-    <div class="snel-seo-classic" style="margin-top:20px;">
+    <div class="snel-seo-classic" style="margin-top:20px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:16px 20px;">
         <h2 style="font-size:14px;margin:0 0 12px;">Snel <em style="font-family:serif;font-style:italic;font-weight:normal;">SEO</em></h2>
 
         <!-- Tabs -->
