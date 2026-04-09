@@ -60,6 +60,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'separator'            => isset( $settings['separator'] ) ? $settings['separator'] : 'sc-dash',
         'default_og_image'     => isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '',
         'post_type_settings'   => get_option( SnelSeoConfig::$option_cpt, array() ),
+        'taxonomy_settings'    => get_option( SnelSeoConfig::$option_tax, array() ),
     );
     $ml_defaults = array(
         'site_tagline'  => '',
@@ -98,6 +99,7 @@ add_action( 'admin_enqueue_scripts', function ( $hook ) {
         'siteName'     => get_bloginfo( 'name' ),
         'siteDesc'     => get_bloginfo( 'description' ),
         'postTypes'    => snel_seo_get_custom_post_types_with_meta(),
+        'taxonomies'   => snel_seo_get_public_taxonomies(),
         'config'       => SnelSeoConfig::to_js(),
     ) );
 } );
@@ -254,6 +256,31 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
             }
         }
         update_option( SnelSeoConfig::$option_cpt, $cpt_settings );
+    }
+
+    // Save taxonomy settings (title + meta description templates per taxonomy).
+    if ( isset( $params['taxonomy_settings'] ) && is_array( $params['taxonomy_settings'] ) ) {
+        $tax_settings = array();
+        foreach ( $params['taxonomy_settings'] as $tax_name => $tax_config ) {
+            $safe_name = sanitize_key( $tax_name );
+            $tax_settings[ $safe_name ] = array();
+
+            foreach ( array( 'title_template', 'metadesc_template' ) as $tpl_key ) {
+                if ( isset( $tax_config[ $tpl_key ] ) ) {
+                    $value = $tax_config[ $tpl_key ];
+                    if ( is_array( $value ) ) {
+                        $sanitized = array();
+                        foreach ( $value as $lang => $text ) {
+                            $sanitized[ sanitize_key( $lang ) ] = sanitize_text_field( $text );
+                        }
+                        $tax_settings[ $safe_name ][ $tpl_key ] = $sanitized;
+                    } else {
+                        $tax_settings[ $safe_name ][ $tpl_key ] = sanitize_text_field( $value );
+                    }
+                }
+            }
+        }
+        update_option( SnelSeoConfig::$option_tax, $tax_settings );
     }
 
     return rest_ensure_response( array( 'success' => true ) );
@@ -419,6 +446,27 @@ function snel_seo_get_custom_post_types_with_meta() {
             'label'      => $pt->labels->name,
             'fields'     => $fields,
             'taxonomies' => $taxonomies,
+        );
+    }
+
+    return $result;
+}
+
+/**
+ * Get all public taxonomies (excluding built-in post tags/categories).
+ */
+function snel_seo_get_public_taxonomies() {
+    $taxonomies = get_taxonomies( array( 'public' => true ), 'objects' );
+    $exclude    = array( 'category', 'post_tag', 'post_format' );
+    $result     = array();
+
+    foreach ( $taxonomies as $tax ) {
+        if ( in_array( $tax->name, $exclude, true ) ) {
+            continue;
+        }
+        $result[] = array(
+            'name'  => $tax->name,
+            'label' => $tax->labels->name,
         );
     }
 

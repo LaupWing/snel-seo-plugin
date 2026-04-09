@@ -55,6 +55,12 @@ export const TEMPLATE_BADGES = phpConfig.templateBadges || {
         { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. \u2013 | /)' },
         { label: 'Category', value: '%%category%%', tip: 'The primary category of the post' },
     ],
+    taxonomy: [
+        { label: 'Term Title', value: '%%term_title%%', tip: 'The name of the current category or term' },
+        { label: 'Term Description', value: '%%term_description%%', tip: 'The description of the current category or term' },
+        { label: 'Site Name', value: '%%sitename%%', tip: 'Your website name as set in General settings' },
+        { label: 'Separator', value: '%%separator%%', tip: 'The character between title parts (e.g. \u2013 | /)' },
+    ],
 };
 
 // ── Character Limits ─────────────────────────────────────────────────

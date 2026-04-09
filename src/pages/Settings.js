@@ -1,6 +1,6 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database } from 'lucide-react';
+import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database, Tags } from 'lucide-react';
 import SCHEMA_TYPES from '../schema-types';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from '../components/TemplateInput';
@@ -698,9 +698,17 @@ export default function Settings() {
  */
 function PostTypesTab( { settings, setSettings, isMultilingual, languages, defaultLang, activeLang, setActiveLang, previewVars, setNotice } ) {
     const postTypes = window.snelSeo?.postTypes || [];
+    const taxonomies = window.snelSeo?.taxonomies || [];
 
     const [ activeCpt, setActiveCpt ] = useState( postTypes[0]?.name || '' );
+    const [ activeTax, setActiveTax ] = useState( '' );
     const currentCpt = postTypes.find( ( pt ) => pt.name === activeCpt );
+
+    // When a taxonomy is selected, deselect CPT and vice versa.
+    const selectCpt = ( name ) => { setActiveCpt( name ); setActiveTax( '' ); };
+    const selectTax = ( name ) => { setActiveTax( name ); setActiveCpt( '' ); };
+
+    const currentTax = taxonomies.find( ( t ) => t.name === activeTax );
 
     // Read/write post type settings from the main settings object.
     const cptSettings = settings.post_type_settings || {};
@@ -718,6 +726,112 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
             },
         } ) );
     };
+
+    // Taxonomy settings helpers.
+    const taxSettings = settings.taxonomy_settings || {};
+    const getTaxConfig = ( taxName ) => taxSettings[ taxName ] || {};
+
+    const updateTaxConfig = ( taxName, key, value ) => {
+        setSettings( ( prev ) => ( {
+            ...prev,
+            taxonomy_settings: {
+                ...( prev.taxonomy_settings || {} ),
+                [ taxName ]: {
+                    ...( ( prev.taxonomy_settings || {} )[ taxName ] || {} ),
+                    [ key ]: value,
+                },
+            },
+        } ) );
+    };
+
+    const taxConfig = getTaxConfig( activeTax );
+
+    const getTaxVal = ( key ) => {
+        const val = taxConfig[ key ];
+        if ( ! val ) return '';
+        if ( isMultilingual && typeof val === 'object' ) return val[ activeLang ] || '';
+        if ( typeof val === 'object' ) return val[ defaultLang ] || '';
+        return val || '';
+    };
+
+    const updateTaxVal = ( key, value ) => {
+        if ( isMultilingual ) {
+            const current = taxConfig[ key ];
+            const obj = ( typeof current === 'object' && current !== null ) ? { ...current } : {};
+            obj[ activeLang ] = value;
+            updateTaxConfig( activeTax, key, obj );
+        } else {
+            updateTaxConfig( activeTax, key, value );
+        }
+    };
+
+    // Taxonomy translate single field.
+    const handleTaxTranslateSingle = ( key, type ) => async ( { animateText } ) => {
+        const val = taxConfig[ key ];
+        const sourceText = ( typeof val === 'object' && val !== null ) ? ( val[ defaultLang ] || '' ) : ( val || '' );
+        if ( ! sourceText ) return;
+
+        await animateText( `✦ Translating ${ activeLang.toUpperCase() }...` );
+
+        const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+            body: JSON.stringify( { text: sourceText, lang: activeLang, type } ),
+        } );
+        const data = await res.json();
+        if ( data.result ) {
+            updateTaxVal( key, data.result );
+            await animateText( '✓ Done' );
+            await new Promise( ( r ) => setTimeout( r, 1000 ) );
+        } else if ( data.code || data.message ) {
+            setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+        }
+    };
+
+    // Taxonomy translate all.
+    const handleTaxTranslateAll = async ( { animateText } ) => {
+        const keys = [ [ 'title_template', 'title' ], [ 'metadesc_template', 'description' ] ];
+        const targetLangs = activeLang === defaultLang
+            ? languages.filter( ( l ) => l.code !== defaultLang )
+            : [ { code: activeLang } ];
+
+        for ( const lang of targetLangs ) {
+            for ( const [ key, type ] of keys ) {
+                const val = taxConfig[ key ];
+                const sourceText = ( typeof val === 'object' && val !== null ) ? ( val[ defaultLang ] || '' ) : ( val || '' );
+                if ( ! sourceText ) continue;
+
+                await animateText( `✦ ${ lang.code.toUpperCase() } ${ type }...` );
+
+                const res = await fetch( `${ window.snelSeo.restUrl }/settings/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
+                    body: JSON.stringify( { text: sourceText, lang: lang.code, type } ),
+                } );
+                const data = await res.json();
+                if ( data.result ) {
+                    const current = taxConfig[ key ];
+                    const obj = ( typeof current === 'object' && current !== null ) ? { ...current } : {};
+                    obj[ lang.code ] = data.result;
+                    updateTaxConfig( activeTax, key, obj );
+                } else if ( data.code || data.message ) {
+                    setNotice( { type: 'error', message: data.message || __( 'Translation failed.', 'snel-seo' ) } );
+                    return;
+                }
+            }
+
+            await animateText( `${ lang.code.toUpperCase() } ✓` );
+            await new Promise( ( r ) => setTimeout( r, 500 ) );
+        }
+
+        await animateText( 'All done ✓' );
+        await new Promise( ( r ) => setTimeout( r, 1200 ) );
+    };
+
+    const hasTaxSource = [ 'title_template', 'metadesc_template' ].some( ( key ) => {
+        const val = taxConfig[ key ];
+        return ( typeof val === 'object' && val !== null ) ? !! val[ defaultLang ] : !! val;
+    } );
 
     const config = getCptConfig( activeCpt );
     const descFallbacks = config.desc_fallback_keys || [];
@@ -857,7 +971,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
 
     return (
         <div className="flex gap-6">
-            {/* Sidebar — post type list */ }
+            {/* Sidebar — post type + taxonomy list */ }
             <div className="w-48 shrink-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">
                     { __( 'Post Types', 'snel-seo' ) }
@@ -866,7 +980,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                     { postTypes.map( ( pt ) => (
                         <button
                             key={ pt.name }
-                            onClick={ () => setActiveCpt( pt.name ) }
+                            onClick={ () => selectCpt( pt.name ) }
                             className={ `w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${ activeCpt === pt.name
                                 ? 'bg-blue-50 text-blue-700 font-medium'
                                 : 'text-gray-600 hover:bg-gray-50'
@@ -877,10 +991,132 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                         </button>
                     ) ) }
                 </div>
+                { taxonomies.length > 0 && (
+                    <>
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2 mt-4">
+                            { __( 'Taxonomies', 'snel-seo' ) }
+                        </p>
+                        <div className="space-y-1">
+                            { taxonomies.map( ( tax ) => (
+                                <button
+                                    key={ tax.name }
+                                    onClick={ () => selectTax( tax.name ) }
+                                    className={ `w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${ activeTax === tax.name
+                                        ? 'bg-blue-50 text-blue-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50'
+                                    }` }
+                                >
+                                    <span className="flex items-center gap-1.5">
+                                        <Tags size={ 12 } className="opacity-50" />
+                                        { tax.label }
+                                    </span>
+                                    <span className="block text-xs text-gray-400 mt-0.5">{ tax.name }</span>
+                                </button>
+                            ) ) }
+                        </div>
+                    </>
+                ) }
             </div>
 
             {/* Main content */ }
             <div className="flex-1 space-y-6">
+                {/* Taxonomy panel */ }
+                { activeTax && currentTax && (
+                    <>
+                        {/* Language switcher + Translate All */ }
+                        { isMultilingual && (
+                            <div className="flex items-center justify-between">
+                                <LangSwitcher
+                                    languages={ languages }
+                                    activeLang={ activeLang }
+                                    defaultLang={ defaultLang }
+                                    onChange={ setActiveLang }
+                                    getStatus={ ( code ) => {
+                                        const titleVal = taxConfig.title_template;
+                                        const descVal = taxConfig.metadesc_template;
+                                        const rawTitle = typeof titleVal === 'object' ? titleVal[ code ] : '';
+                                        const rawDesc = typeof descVal === 'object' ? descVal[ code ] : '';
+                                        const defaultTitle = typeof titleVal === 'object' ? titleVal[ defaultLang ] : titleVal;
+                                        const defaultDesc = typeof descVal === 'object' ? descVal[ defaultLang ] : descVal;
+                                        const titleDone = !! rawTitle || isTemplateOnly( defaultTitle ) || ! defaultTitle;
+                                        const descDone = !! rawDesc || isTemplateOnly( defaultDesc ) || ! defaultDesc;
+                                        if ( titleDone && descDone ) return 'complete';
+                                        if ( titleDone || descDone ) return 'partial';
+                                        return 'empty';
+                                    } }
+                                />
+                                { hasTaxSource && (
+                                    <TranslateButton
+                                        onTranslate={ handleTaxTranslateAll }
+                                        label={ activeLang === defaultLang
+                                            ? __( 'Translate All', 'snel-seo' )
+                                            : `${ __( 'Translate All for', 'snel-seo' ) } ${ activeLang.toUpperCase() }` }
+                                        size="sm"
+                                    />
+                                ) }
+                            </div>
+                        ) }
+
+                        {/* Title template */ }
+                        <TemplateInput
+                            label={ __( 'SEO Title Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                            value={ getTaxVal( 'title_template' ) }
+                            onChange={ ( v ) => updateTaxVal( 'title_template', v ) }
+                            badgeGroup="taxonomy"
+                            placeholder="%%term_title%% %%separator%% %%sitename%%"
+                            defaultValue="%%term_title%% %%separator%% %%sitename%%"
+                            showReset={ activeLang === defaultLang }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getTaxVal( 'title_template' ) || '%%term_title%% %%separator%% %%sitename%%', { ...previewVars, term_title: currentTax?.label || '' } ) }</strong></> }
+                            action={ isMultilingual && activeLang !== defaultLang && ( () => {
+                                const val = taxConfig.title_template;
+                                return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
+                                    <TranslateButton
+                                        onTranslate={ handleTaxTranslateSingle( 'title_template', 'title' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) : null;
+                            } )() }
+                        />
+
+                        {/* Meta description template */ }
+                        <TemplateInput
+                            label={ __( 'Meta Description Template', 'snel-seo' ) + ( isMultilingual ? ` (${ activeLang.toUpperCase() })` : '' ) }
+                            value={ getTaxVal( 'metadesc_template' ) }
+                            onChange={ ( v ) => updateTaxVal( 'metadesc_template', v ) }
+                            badgeGroup="taxonomy"
+                            maxLength={ MAX_DESC_LENGTH }
+                            placeholder="%%term_title%% %%separator%% %%term_description%%"
+                            defaultValue=""
+                            showReset={ activeLang === defaultLang }
+                            hint={ <>{ __( 'Preview:', 'snel-seo' ) } <strong>{ resolveTemplate( getTaxVal( 'metadesc_template' ) || '%%term_title%% %%separator%% %%term_description%%', { ...previewVars, term_title: currentTax?.label || '', term_description: __( 'Category description here', 'snel-seo' ) } ) }</strong></> }
+                            action={ isMultilingual && activeLang !== defaultLang && ( () => {
+                                const val = taxConfig.metadesc_template;
+                                return ( typeof val === 'object' ? val[ defaultLang ] : val ) ? (
+                                    <TranslateButton
+                                        onTranslate={ handleTaxTranslateSingle( 'metadesc_template', 'description' ) }
+                                        label={ __( 'Translate', 'snel-seo' ) }
+                                        size="sm"
+                                    />
+                                ) : null;
+                            } )() }
+                        />
+
+                        {/* Google Preview */ }
+                        <GooglePreview
+                            title={ resolveTemplate( getTaxVal( 'title_template' ) || '%%term_title%% %%separator%% %%sitename%%', { ...previewVars, term_title: currentTax?.label || '' } ) }
+                            url={ window.snelSeo?.siteUrl + '/' + activeTax + '/example/' }
+                            description={ resolveTemplate( getTaxVal( 'metadesc_template' ) || '%%term_title%% %%separator%% %%term_description%%', { ...previewVars, term_title: currentTax?.label || '', term_description: __( 'Category description here', 'snel-seo' ) } ) }
+                        />
+
+                        <p className="text-xs text-gray-400">
+                            { __( 'Note: If a category has its own description filled in, that takes priority over this template.', 'snel-seo' ) }
+                        </p>
+                    </>
+                ) }
+
+                {/* CPT panel */ }
+                { activeCpt && currentCpt && <>
                 {/* Language switcher + Translate All */ }
                 { isMultilingual && (
                     <div className="flex items-center justify-between">
@@ -1161,6 +1397,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                         } )() }
                     </div>
                 </div>
+                </> }
             </div>
         </div>
     );

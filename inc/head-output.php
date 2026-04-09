@@ -204,6 +204,33 @@ add_filter( 'pre_get_document_title', function ( $title ) {
         }
     }
 
+    // Taxonomy archive template.
+    if ( is_tax() || is_category() || is_tag() ) {
+        $term = get_queried_object();
+        if ( $term ) {
+            $tax_settings = get_option( SnelSeoConfig::$option_tax, array() );
+            $tax_config   = isset( $tax_settings[ $term->taxonomy ] ) ? $tax_settings[ $term->taxonomy ] : array();
+            $template     = snel_seo_get_cpt_template( $tax_config, 'title_template' );
+
+            // Resolve translated term name and description.
+            $lang    = snel_seo_get_current_lang();
+            $default = snel_seo_get_default_lang();
+            $term_title = '';
+            $term_desc  = '';
+            if ( $lang !== $default ) {
+                $term_title = get_term_meta( $term->term_id, '_name_' . $lang, true );
+                $term_desc  = get_term_meta( $term->term_id, '_desc_' . $lang, true );
+            }
+            $vars['term_title']       = $term_title ?: $term->name;
+            $vars['term_description'] = wp_strip_all_tags( $term_desc ?: $term->description );
+
+            if ( $template ) {
+                return snel_seo_resolve_template( $template, $vars );
+            }
+            return snel_seo_resolve_template( '%%term_title%% %%separator%% %%sitename%%', $vars );
+        }
+    }
+
     // Custom post type template.
     if ( is_singular() ) {
         $post_type = get_post_type();
@@ -386,6 +413,25 @@ add_action( 'wp_head', function () {
                 }
                 if ( $desc ) {
                     $description = mb_substr( wp_strip_all_tags( $desc ), 0, 155 );
+                }
+                // Fall back to taxonomy meta description template.
+                if ( ! $description ) {
+                    $tax_settings = get_option( SnelSeoConfig::$option_tax, array() );
+                    $tax_config   = isset( $tax_settings[ $term->taxonomy ] ) ? $tax_settings[ $term->taxonomy ] : array();
+                    $tpl          = snel_seo_get_cpt_template( $tax_config, 'metadesc_template' );
+                    if ( $tpl ) {
+                        $term_title = '';
+                        $term_desc  = '';
+                        if ( $lang !== $default ) {
+                            $term_title = get_term_meta( $term->term_id, '_name_' . $lang, true );
+                            $term_desc  = get_term_meta( $term->term_id, '_desc_' . $lang, true );
+                        }
+                        $tax_vars = array_merge( $vars, array(
+                            'term_title'       => $term_title ?: $term->name,
+                            'term_description' => wp_strip_all_tags( $term_desc ?: $term->description ),
+                        ) );
+                        $description = snel_seo_resolve_template( $tpl, $tax_vars );
+                    }
                 }
             }
         }

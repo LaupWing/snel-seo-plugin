@@ -13,6 +13,7 @@ class SnelSeoConfig {
     // ── WP Option Names ──────────────────────────────────────────────
     public static $option_titles   = 'wpseo_titles';          // Legacy name (Yoast compat)
     public static $option_cpt      = 'snel_seo_post_type_settings';
+    public static $option_tax      = 'snel_seo_taxonomy_settings';
     public static $option_sitemap  = 'snel_seo_sitemap';
     public static $option_robots   = 'snel_seo_robots_txt';
 
@@ -82,6 +83,12 @@ class SnelSeoConfig {
             array( 'label' => 'Site Name',  'value' => '%%sitename%%' ),
             array( 'label' => 'Separator',  'value' => '%%separator%%' ),
             array( 'label' => 'Category',   'value' => '%%category%%' ),
+        ),
+        'taxonomy' => array(
+            array( 'label' => 'Term Title',       'value' => '%%term_title%%' ),
+            array( 'label' => 'Term Description', 'value' => '%%term_description%%' ),
+            array( 'label' => 'Site Name',         'value' => '%%sitename%%' ),
+            array( 'label' => 'Separator',         'value' => '%%separator%%' ),
         ),
     );
 
