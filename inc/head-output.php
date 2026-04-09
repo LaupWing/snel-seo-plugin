@@ -208,13 +208,15 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     if ( is_tax() || is_category() || is_tag() ) {
         $term = get_queried_object();
         if ( $term ) {
-            $tax_settings = get_option( SnelSeoConfig::$option_tax, array() );
-            $tax_config   = isset( $tax_settings[ $term->taxonomy ] ) ? $tax_settings[ $term->taxonomy ] : array();
-            $template     = snel_seo_get_cpt_template( $tax_config, 'title_template' );
-
-            // Resolve translated term name and description.
             $lang    = snel_seo_get_current_lang();
             $default = snel_seo_get_default_lang();
+
+            // Check for per-term SEO title override.
+            $raw_seo_title = get_term_meta( $term->term_id, '_snel_seo_title', true );
+            $seo_titles    = $raw_seo_title ? json_decode( $raw_seo_title, true ) : array();
+            $custom_title  = ! empty( $seo_titles[ $lang ] ) ? $seo_titles[ $lang ] : ( ! empty( $seo_titles[ $default ] ) ? $seo_titles[ $default ] : '' );
+
+            // Resolve translated term name and description for template vars.
             $term_title = '';
             $term_desc  = '';
             if ( $lang !== $default ) {
@@ -223,6 +225,16 @@ add_filter( 'pre_get_document_title', function ( $title ) {
             }
             $vars['term_title']       = $term_title ?: $term->name;
             $vars['term_description'] = wp_strip_all_tags( $term_desc ?: $term->description );
+
+            // If custom SEO title set, use it as %%term_title%% replacement.
+            if ( $custom_title ) {
+                $vars['title'] = $custom_title;
+                return snel_seo_resolve_template( '%%title%% %%separator%% %%sitename%%', $vars );
+            }
+
+            $tax_settings = get_option( SnelSeoConfig::$option_tax, array() );
+            $tax_config   = isset( $tax_settings[ $term->taxonomy ] ) ? $tax_settings[ $term->taxonomy ] : array();
+            $template     = snel_seo_get_cpt_template( $tax_config, 'title_template' );
 
             if ( $template ) {
                 return snel_seo_resolve_template( $template, $vars );
@@ -402,16 +414,25 @@ add_action( 'wp_head', function () {
             if ( $term ) {
                 $lang    = snel_seo_get_current_lang();
                 $default = snel_seo_get_default_lang();
-                $desc    = '';
-                // Try translated description first.
-                if ( $lang !== $default ) {
+
+                // Check for per-term SEO description override first.
+                $raw_seo_desc = get_term_meta( $term->term_id, '_snel_seo_metadesc', true );
+                $seo_descs    = $raw_seo_desc ? json_decode( $raw_seo_desc, true ) : array();
+                $custom_desc  = ! empty( $seo_descs[ $lang ] ) ? $seo_descs[ $lang ] : ( ! empty( $seo_descs[ $default ] ) ? $seo_descs[ $default ] : '' );
+                if ( $custom_desc ) {
+                    $description = $custom_desc;
+                }
+
+                $desc = '';
+                // Try translated description first (only if no custom SEO override).
+                if ( ! $description && $lang !== $default ) {
                     $desc = get_term_meta( $term->term_id, '_desc_' . $lang, true );
                 }
-                // Fall back to default language description.
-                if ( ! $desc && ! empty( $term->description ) ) {
+                // Fall back to default language description (only if no custom SEO override).
+                if ( ! $description && ! $desc && ! empty( $term->description ) ) {
                     $desc = $term->description;
                 }
-                if ( $desc ) {
+                if ( ! $description && $desc ) {
                     $description = mb_substr( wp_strip_all_tags( $desc ), 0, 155 );
                 }
                 // Fall back to taxonomy meta description template.
