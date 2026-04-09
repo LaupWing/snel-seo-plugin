@@ -246,7 +246,7 @@ add_action( 'wp_footer', function () {
     <div id="snel-seo-popover">
         <div class="snel-seo-pop-header">
             <h3>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                 Snel <em style="font-family:Georgia,serif;font-style:italic;font-weight:400;">SEO</em>
                 <span style="font-size:10px;font-weight:400;color:#9ca3af;margin-left:2px;"><?php echo esc_html( SNEL_SEO_VERSION ); ?></span>
             </h3>
@@ -329,7 +329,13 @@ add_action( 'wp_footer', function () {
                 if (!popoverEl.classList.contains('snel-seo-popover-open')) return;
                 var rect = barItemEl.getBoundingClientRect();
                 popoverEl.style.top = rect.bottom + 'px';
-                popoverEl.style.right = (window.innerWidth - rect.right) + 'px';
+                var popWidth = popoverEl.offsetWidth || 340;
+                var center = rect.left + (rect.width / 2);
+                var left = center - (popWidth / 2);
+                if (left + popWidth > window.innerWidth - 8) left = window.innerWidth - popWidth - 8;
+                if (left < 8) left = 8;
+                popoverEl.style.left = left + 'px';
+                popoverEl.style.right = 'auto';
             };
             var observer = new MutationObserver(positionPopover);
             observer.observe(popoverEl, { attributes: true, attributeFilter: ['class'] });
