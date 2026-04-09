@@ -1,6 +1,6 @@
 import { useState } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database, Tags, Info } from 'lucide-react';
+import { Globe, Home, FileText, PenTool, Save, Image, X, Languages, Boxes, GripVertical, Plus, Trash2, Database, Tags, Info, HelpCircle, ArrowDown, ExternalLink } from 'lucide-react';
 import SCHEMA_TYPES from '../schema-types';
 import { Tooltip } from '@wordpress/components';
 import TemplateInput from '../components/TemplateInput';
@@ -97,6 +97,9 @@ export default function Settings() {
     const [ translatingAll, setTranslatingAll ] = useState( false );
     const [ btnText, setBtnText ] = useState( null );
     const [ btnAnimStyle, setBtnAnimStyle ] = useState( {} );
+
+    // Help modal state
+    const [ showHelp, setShowHelp ] = useState( false );
 
     // Tagline inline language state
     const [ taglineLang, setTaglineLang ] = useState( defaultLang );
@@ -334,9 +337,19 @@ export default function Settings() {
                     <h1 className="text-xl font-bold text-gray-900">
                         SEO <em className="font-serif font-normal italic">Settings</em>
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        { __( 'Configure how your site appears in search results', 'snel-seo' ) }
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-sm text-gray-500">
+                            { __( 'Configure how your site appears in search results', 'snel-seo' ) }
+                        </p>
+                        <button
+                            type="button"
+                            onClick={ () => setShowHelp( true ) }
+                            className="text-gray-400 hover:text-blue-600 transition-colors"
+                            title={ __( 'How does this work?', 'snel-seo' ) }
+                        >
+                            <HelpCircle size={ 16 } />
+                        </button>
+                    </div>
                 </div>
                 <button
                     onClick={ handleSave }
@@ -347,6 +360,112 @@ export default function Settings() {
                     { saving ? __( 'Saving...', 'snel-seo' ) : __( 'Save Settings', 'snel-seo' ) }
                 </button>
             </div>
+
+            {/* Help Modal */ }
+            { showHelp && (
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/50" onClick={ () => setShowHelp( false ) }>
+                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col" onClick={ ( e ) => e.stopPropagation() }>
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                            <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                                <HelpCircle size={ 18 } className="text-blue-600" />
+                                { __( 'How SEO Settings Work', 'snel-seo' ) }
+                            </h2>
+                            <button type="button" onClick={ () => setShowHelp( false ) } className="text-gray-400 hover:text-gray-600 transition-colors">
+                                <X size={ 18 } />
+                            </button>
+                        </div>
+                        <div className="px-6 py-5 space-y-5 text-sm text-gray-700 overflow-y-auto">
+
+                            {/* Priority chain */ }
+                            <div>
+                                <h3 className="font-semibold text-gray-900 mb-2">{ __( 'Priority Order', 'snel-seo' ) }</h3>
+                                <p className="text-xs text-gray-500 mb-3">{ __( 'Snel SEO picks the first available value from top to bottom:', 'snel-seo' ) }</p>
+                                <div className="space-y-2">
+                                    <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2.5">
+                                        <span className="shrink-0 w-5 h-5 rounded-full bg-emerald-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">1</span>
+                                        <div>
+                                            <p className="font-medium text-emerald-800">{ __( 'Per-page / per-term SEO fields', 'snel-seo' ) }</p>
+                                            <p className="text-xs text-emerald-600 mt-0.5">{ __( 'Custom title or description set on a specific post, page, or category. Highest priority.', 'snel-seo' ) }</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-center"><ArrowDown size={ 14 } className="text-gray-300" /></div>
+                                    <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
+                                        <span className="shrink-0 w-5 h-5 rounded-full bg-blue-500 text-white text-xs font-bold flex items-center justify-center mt-0.5">2</span>
+                                        <div>
+                                            <p className="font-medium text-blue-800">{ __( 'Templates from these Settings', 'snel-seo' ) }</p>
+                                            <p className="text-xs text-blue-600 mt-0.5">{ __( 'The templates you configure here (e.g. %%title%% – %%sitename%%). Used when no custom SEO field is set.', 'snel-seo' ) }</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-center"><ArrowDown size={ 14 } className="text-gray-300" /></div>
+                                    <div className="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                                        <span className="shrink-0 w-5 h-5 rounded-full bg-gray-400 text-white text-xs font-bold flex items-center justify-center mt-0.5">3</span>
+                                        <div>
+                                            <p className="font-medium text-gray-700">{ __( 'WordPress defaults', 'snel-seo' ) }</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">{ __( 'Falls back to the page title, excerpt, or content if nothing else is configured.', 'snel-seo' ) }</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Variable reference */ }
+                            <div>
+                                <h3 className="font-semibold text-gray-900 mb-2">{ __( 'Template Variables', 'snel-seo' ) }</h3>
+                                <p className="text-xs text-gray-500 mb-3">{ __( 'These placeholders are replaced with real values on your site:', 'snel-seo' ) }</p>
+                                <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                                    <table className="w-full text-xs">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 bg-gray-100">
+                                                <th className="text-left px-3 py-2 font-semibold text-gray-600">{ __( 'Variable', 'snel-seo' ) }</th>
+                                                <th className="text-left px-3 py-2 font-semibold text-gray-600">{ __( 'Source', 'snel-seo' ) }</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%sitename%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Website Name (General tab) or WP Settings > Site Title', 'snel-seo' ) }</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%sitedesc%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Site Tagline (General tab) or WP Settings > Tagline', 'snel-seo' ) }</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%separator%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Title Separator (General tab) — e.g. –, |, /', 'snel-seo' ) }</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%title%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Post/page title from the WordPress editor', 'snel-seo' ) }</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%category%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Primary category of the post', 'snel-seo' ) }</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%term_title%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Category/taxonomy name from the term edit screen', 'snel-seo' ) }</td>
+                                            </tr>
+                                            <tr>
+                                                <td className="px-3 py-2"><code className="bg-white px-1.5 py-0.5 rounded border border-gray-200 text-[11px]">%%term_description%%</code></td>
+                                                <td className="px-3 py-2 text-gray-600">{ __( 'Category/taxonomy description from the term edit screen', 'snel-seo' ) }</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl shrink-0">
+                            <button
+                                type="button"
+                                onClick={ () => setShowHelp( false ) }
+                                className="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                { __( 'Got it', 'snel-seo' ) }
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) }
 
             {/* Notice */ }
             { notice && (
