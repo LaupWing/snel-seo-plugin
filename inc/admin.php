@@ -486,3 +486,35 @@ function snel_seo_meta_key_to_label( $key ) {
 
     return $label;
 }
+
+/**
+ * Add SEO hints to taxonomy edit screens.
+ * Shows a note below the description field explaining how it feeds into Snel SEO templates.
+ */
+add_action( 'admin_init', function () {
+    $taxonomies = get_taxonomies( array( 'public' => true ), 'names' );
+    foreach ( $taxonomies as $tax ) {
+        add_action( $tax . '_edit_form_fields', 'snel_seo_taxonomy_description_hint', 11, 2 );
+    }
+} );
+
+function snel_seo_taxonomy_description_hint( $term, $taxonomy ) {
+    ?>
+    <tr class="form-field">
+        <th scope="row"></th>
+        <td>
+            <p class="description" style="margin-top: -8px; color: #2271b1;">
+                <strong>Snel SEO:</strong>
+                <?php
+                printf(
+                    /* translators: 1: %%term_description%% tag */
+                    esc_html__( 'The Name and Description above are used as %1$s and %2$s in your SEO templates.', 'snel-seo' ),
+                    '<code>%%term_title%%</code>',
+                    '<code>%%term_description%%</code>'
+                );
+                ?>
+            </p>
+        </td>
+    </tr>
+    <?php
+}
