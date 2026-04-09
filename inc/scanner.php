@@ -414,13 +414,19 @@ function snel_seo_scanner_results( WP_REST_Request $request ) {
     $table = $wpdb->prefix . 'snel_seo_scans';
 
     $page     = max( 1, (int) $request->get_param( 'page' ) ?: 1 );
-    $per_page = min( 100, max( 10, (int) $request->get_param( 'per_page' ) ?: 20 ) );
+    $per_page = min( 100, max( 1, (int) $request->get_param( 'per_page' ) ?: 20 ) );
     $lang     = sanitize_text_field( $request->get_param( 'lang' ) ?: '' );
     $status   = sanitize_text_field( $request->get_param( 'status' ) ?: '' );
+    $post_id  = (int) $request->get_param( 'post_id' );
     $offset   = ( $page - 1 ) * $per_page;
 
     $where = '1=1';
     $args  = array();
+
+    if ( $post_id ) {
+        $where .= ' AND post_id = %d';
+        $args[] = $post_id;
+    }
 
     if ( $lang ) {
         $where .= ' AND lang = %s';
