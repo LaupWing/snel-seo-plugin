@@ -57,8 +57,8 @@ add_action( 'wp_footer', function () {
     ?>
     <style>
         @keyframes snelSeoBarPulse {
-            0% { opacity: 0.6; transform: scale(1); }
-            100% { opacity: 0; transform: scale(1.6); }
+            0% { opacity: 0.8; transform: scale(1); }
+            100% { opacity: 0; transform: scale(2.4); }
         }
         #snel-seo-popover {
             display: none;
