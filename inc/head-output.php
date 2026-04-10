@@ -479,7 +479,13 @@ add_action( 'wp_head', function () {
     $og_image = '';
 
     // Language-aware OG URL.
-    $og_url = is_singular() ? get_permalink() : home_url( '/' );
+    if ( is_singular() ) {
+        $og_url = get_permalink();
+    } elseif ( is_tax() || is_category() || is_tag() ) {
+        $og_url = get_term_link( get_queried_object() );
+    } else {
+        $og_url = home_url( '/' );
+    }
     if ( function_exists( 'snel_url' ) ) {
         $og_url = snel_url( $og_url );
     }
@@ -541,6 +547,23 @@ add_action( 'wp_head', function () {
         }
 
         $items[] = array( '@type' => 'ListItem', 'position' => $pos, 'name' => get_the_title( $post_id ), 'item' => get_permalink( $post_id ) );
+
+        $breadcrumb = array( '@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => $items );
+        printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
+    } elseif ( is_tax() || is_category() || is_tag() ) {
+        $term  = get_queried_object();
+        $items = array();
+        $pos   = 1;
+
+        $items[] = array( '@type' => 'ListItem', 'position' => $pos++, 'name' => $site_name, 'item' => $site_url );
+
+        // Add parent term if exists.
+        if ( $term->parent ) {
+            $parent  = get_term( $term->parent, $term->taxonomy );
+            $items[] = array( '@type' => 'ListItem', 'position' => $pos++, 'name' => $parent->name, 'item' => get_term_link( $parent ) );
+        }
+
+        $items[] = array( '@type' => 'ListItem', 'position' => $pos, 'name' => $term->name, 'item' => get_term_link( $term ) );
 
         $breadcrumb = array( '@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => $items );
         printf( '<script type="application/ld+json">%s</script>' . "\n", wp_json_encode( $breadcrumb, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) );
