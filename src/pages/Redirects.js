@@ -1,7 +1,7 @@
 import { useState, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Modal, SelectControl } from '@wordpress/components';
-import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk, FlaskConical, CheckCircle2, XCircle, Filter, TrendingUp } from 'lucide-react';
+import { ArrowRightLeft, Plus, Trash2, ArrowRight, Loader2, Upload, Trash, Search, ChevronLeft, ChevronRight, Pencil, AlertTriangle, ExternalLink, Asterisk, FlaskConical, CheckCircle2, XCircle, Filter, TrendingUp, Download } from 'lucide-react';
 import Tabs from '../components/Tabs';
 
 const TABS = [
@@ -74,13 +74,42 @@ function FourOhFourLog( { onAddRedirect } ) {
                     }
                 </p>
                 { entries.length > 0 && (
-                    <button
-                        onClick={ handleClearAll }
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                        <Trash size={ 14 } />
-                        { __( 'Clear Log', 'snel-seo' ) }
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={ () => {
+                                const rows = [ [ 'URL', 'Hits', 'Referrer', 'First Seen', 'Last Seen' ] ];
+                                entries.forEach( ( e ) => rows.push( [ e.url, e.hits, e.referrer || '', e.first_seen || '', e.last_seen || '' ] ) );
+                                const csv = rows.map( ( r ) => r.map( ( v ) => `"${ String( v ).replace( /"/g, '""' ) }"` ).join( ',' ) ).join( '\n' );
+                                const a = document.createElement( 'a' );
+                                a.href = URL.createObjectURL( new Blob( [ csv ], { type: 'text/csv' } ) );
+                                a.download = `404-log-${ new Date().toISOString().slice( 0, 10 ) }.csv`;
+                                a.click();
+                            } }
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            <Download size={ 14 } />
+                            CSV
+                        </button>
+                        <button
+                            onClick={ () => {
+                                const a = document.createElement( 'a' );
+                                a.href = URL.createObjectURL( new Blob( [ JSON.stringify( entries, null, 2 ) ], { type: 'application/json' } ) );
+                                a.download = `404-log-${ new Date().toISOString().slice( 0, 10 ) }.json`;
+                                a.click();
+                            } }
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            <Download size={ 14 } />
+                            JSON
+                        </button>
+                        <button
+                            onClick={ handleClearAll }
+                            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        >
+                            <Trash size={ 14 } />
+                            { __( 'Clear Log', 'snel-seo' ) }
+                        </button>
+                    </div>
                 ) }
             </div>
 
