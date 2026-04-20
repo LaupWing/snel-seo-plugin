@@ -1426,7 +1426,7 @@ function PostTypesTab( { settings, setSettings, isMultilingual, languages, defau
                 <GooglePreview
                     title={ resolveTemplate( getCptVal( 'title_template' ) || '%%title%% %%separator%% %%sitename%%', { ...previewVars, title: currentCpt?.label || '' } ) }
                     url={ window.snelSeo?.siteUrl + '/' + activeCpt + '/example/' }
-                    description={ getCptVal( 'metadesc_template' ) || '%%title%% %%separator%% %%sitedesc%%' }
+                    description={ resolveTemplate( getCptVal( 'metadesc_template' ) || '%%title%% %%separator%% %%sitedesc%%', { ...previewVars, title: currentCpt?.label || '' } ) }
                 />
 
                 {/* Schema / Structured Data */ }
