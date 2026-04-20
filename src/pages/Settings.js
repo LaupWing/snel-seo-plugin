@@ -74,7 +74,9 @@ export default function Settings() {
 
     // Pre-fill empty languages with default language values on mount.
     useState( () => {
-        if ( ! isMultilingual ) return;
+        if ( ! isMultilingual ) {
+            return;
+        }
         const defaults = DEFAULT_TEMPLATES;
         setSettings( ( prev ) => {
             const next = { ...prev };
@@ -82,7 +84,6 @@ export default function Settings() {
             for ( const key of MULTILINGUAL_KEYS ) {
                 const val = next[ key ];
                 const obj = ( typeof val === 'object' && val !== null ) ? { ...val } : {};
-                // Ensure default lang has a value
                 if ( ! obj[ defaultLang ] && defaults[ key ] ) {
                     obj[ defaultLang ] = defaults[ key ];
                     changed = true;
