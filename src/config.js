@@ -30,11 +30,11 @@ export function getSeparatorChar( value ) {
 // ── Default Templates ────────────────────────────────────────────────
 export const DEFAULT_TEMPLATES = phpConfig.defaultTemplates || {
     title_home: '%%sitename%% %%separator%% %%sitedesc%%',
-    metadesc_home: '',
+    metadesc_home: '%%sitename%% %%separator%% %%sitedesc%%',
     title_post: '%%title%% %%separator%% %%sitename%%',
-    metadesc_post: '',
+    metadesc_post: '%%title%% %%separator%% %%sitedesc%%',
     title_page: '%%title%% %%separator%% %%sitename%%',
-    metadesc_page: '',
+    metadesc_page: '%%title%% %%separator%% %%sitedesc%%',
 };
 
 // ── Template Variable Badges ─────────────────────────────────────────
