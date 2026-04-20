@@ -53,6 +53,19 @@ add_action( 'wp_footer', function () {
     } elseif ( is_tax() || is_category() || is_tag() ) {
         $object_type = 'term';
         $object_id   = get_queried_object_id();
+    } elseif ( is_front_page() || is_home() ) {
+        $front_page_id = (int) get_option( 'page_on_front' );
+        if ( $front_page_id > 0 ) {
+            $object_type = 'post';
+            $object_id   = $front_page_id;
+        } else {
+            // Latest posts homepage — use virtual ID 0 with homepage type.
+            $object_type = 'homepage';
+            $object_id   = 0;
+        }
+    } elseif ( is_post_type_archive() ) {
+        $object_type = 'archive';
+        $object_id   = 0;
     }
     ?>
     <style>
@@ -423,7 +436,7 @@ add_action( 'wp_footer', function () {
             }
         });
 
-        if (!objectId || !objectType) {
+        if (!objectType) {
             scanBtn.disabled = true;
             scanBtnText.textContent = 'Not a scannable page';
             return;
@@ -451,6 +464,7 @@ add_action( 'wp_footer', function () {
 
             var batchBody = { languages: [lang] };
             if (objectType === 'term') { batchBody.term_ids = [objectId]; }
+            else if (objectType === 'homepage' || objectType === 'archive') { batchBody.direct_urls = [{ url: window.location.href, object_type: objectType, object_id: 0 }]; }
             else { batchBody.post_ids = [objectId]; }
 
             fetch(restUrl + '/scanner/batch', {
@@ -497,7 +511,15 @@ add_action( 'wp_footer', function () {
         });
 
         // On load, check if there's an existing scan result for this page.
-        fetch(restUrl + '/scanner/results?' + new URLSearchParams({ page: 1, per_page: 1, object_type: objectType, object_id: objectId, lang: lang }), {
+        var resultsParams = { page: 1, per_page: 1, lang: lang };
+        if (objectType === 'homepage' || objectType === 'archive') {
+            resultsParams.object_type = objectType;
+            resultsParams.object_id = 0;
+        } else {
+            resultsParams.object_type = objectType;
+            resultsParams.object_id = objectId;
+        }
+        fetch(restUrl + '/scanner/results?' + new URLSearchParams(resultsParams), {
             headers: { 'X-WP-Nonce': nonce }
         })
         .then(function(r) { return r.json(); })

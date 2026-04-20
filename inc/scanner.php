@@ -440,12 +440,13 @@ function snel_seo_scanner_queue( WP_REST_Request $request ) {
  * Scan a batch of pages (posts and/or terms).
  */
 function snel_seo_scanner_batch( WP_REST_Request $request ) {
-    $params   = $request->get_json_params();
-    $post_ids = $params['post_ids'] ?? array();
-    $term_ids = $params['term_ids'] ?? array();
-    $langs    = $params['languages'] ?? array( snel_seo_get_default_lang() );
+    $params      = $request->get_json_params();
+    $post_ids    = $params['post_ids'] ?? array();
+    $term_ids    = $params['term_ids'] ?? array();
+    $direct_urls = $params['direct_urls'] ?? array();
+    $langs       = $params['languages'] ?? array( snel_seo_get_default_lang() );
 
-    if ( empty( $post_ids ) && empty( $term_ids ) ) {
+    if ( empty( $post_ids ) && empty( $term_ids ) && empty( $direct_urls ) ) {
         return new WP_Error( 'no_items', 'No post or term IDs provided.', array( 'status' => 400 ) );
     }
 
@@ -479,6 +480,20 @@ function snel_seo_scanner_batch( WP_REST_Request $request ) {
             $url    = snel_seo_build_lang_url( $permalink, $lang );
             $result = snel_seo_scan_url( $url, $lang, 'term', (int) $term_id );
             $result['term_id'] = (int) $term_id;
+            $results[] = $result;
+        }
+    }
+
+    // Scan direct URLs (homepage, archives — no post/term ID).
+    foreach ( $direct_urls as $item ) {
+        $url         = esc_url_raw( $item['url'] ?? '' );
+        $object_type = sanitize_key( $item['object_type'] ?? 'homepage' );
+        $object_id   = 0;
+        if ( ! $url ) continue;
+
+        foreach ( $langs as $lang ) {
+            $lang_url = $url; // Already the current lang URL from the browser.
+            $result   = snel_seo_scan_url( $lang_url, $lang, $object_type, $object_id );
             $results[] = $result;
         }
     }
