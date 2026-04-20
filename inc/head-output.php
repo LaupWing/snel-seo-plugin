@@ -463,6 +463,11 @@ add_action( 'wp_head', function () {
         $description = snel_seo_auto_description( get_queried_object_id() );
     }
 
+    // Homepage fallback: use tagline if meta description template is empty.
+    if ( ! $description && ( is_front_page() || is_home() ) ) {
+        $description = $vars['sitedesc'];
+    }
+
     // Global fallback.
     if ( ! $description ) {
         $description = snel_seo_get_ml_setting( $settings, 'metadesc-home-wpseo' );
