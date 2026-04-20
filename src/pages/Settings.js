@@ -701,7 +701,7 @@ export default function Settings() {
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl }
-                            description={ getVal( 'metadesc_home' ) || '%%sitename%% %%separator%% %%sitedesc%%' }
+                            description={ resolveTemplate( getVal( 'metadesc_home' ) || '%%sitename%% %%separator%% %%sitedesc%%', previewVars ) }
                         />
                     </div>
                 ) }
@@ -745,7 +745,7 @@ export default function Settings() {
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_page' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl + '/example-page/' }
-                            description={ getVal( 'metadesc_page' ) || '%%title%% %%separator%% %%sitedesc%%' }
+                            description={ resolveTemplate( getVal( 'metadesc_page' ) || '%%title%% %%separator%% %%sitedesc%%', previewVars ) }
                         />
                     </div>
                 ) }
@@ -789,7 +789,7 @@ export default function Settings() {
                         <GooglePreview
                             title={ resolveTemplate( getVal( 'title_post' ) || '%%title%% %%separator%% %%sitename%%', previewVars ) }
                             url={ window.snelSeo?.siteUrl + '/example-post/' }
-                            description={ getVal( 'metadesc_post' ) || '%%title%% %%separator%% %%sitedesc%%' }
+                            description={ resolveTemplate( getVal( 'metadesc_post' ) || '%%title%% %%separator%% %%sitedesc%%', previewVars ) }
                         />
                     </div>
                 ) }
