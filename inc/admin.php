@@ -204,9 +204,16 @@ function snel_seo_save_settings( WP_REST_Request $request ) {
                 // Sanitize each language value and store as JSON string.
                 $sanitized = array();
                 foreach ( $value as $lang => $text ) {
-                    $sanitized[ sanitize_key( $lang ) ] = sanitize_text_field( $text );
+                    $clean = sanitize_text_field( $text );
+                    if ( $clean !== '' ) {
+                        $sanitized[ sanitize_key( $lang ) ] = $clean;
+                    }
                 }
-                $settings[ $wp_key ] = wp_json_encode( $sanitized );
+                if ( ! empty( $sanitized ) ) {
+                    $settings[ $wp_key ] = wp_json_encode( $sanitized );
+                } else {
+                    unset( $settings[ $wp_key ] );
+                }
             } else {
                 $settings[ $wp_key ] = sanitize_text_field( $value );
             }
