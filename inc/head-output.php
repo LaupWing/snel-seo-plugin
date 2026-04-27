@@ -507,12 +507,22 @@ add_action( 'wp_head', function () {
     if ( ! $og_image && is_singular() ) $og_image = get_the_post_thumbnail_url( get_queried_object_id(), 'large' );
     if ( ! $og_image ) $og_image = isset( $settings['default_og_image'] ) ? $settings['default_og_image'] : '';
 
+    $locales   = include __DIR__ . '/locales.php';
+    $og_locale = $locales[ snel_seo_get_current_lang() ] ?? get_locale();
+
     if ( $og_title ) printf( '<meta property="og:title" content="%s" />' . "\n", esc_attr( $og_title ) );
     if ( $og_desc ) printf( '<meta property="og:description" content="%s" />' . "\n", esc_attr( $og_desc ) );
     if ( $og_image ) printf( '<meta property="og:image" content="%s" />' . "\n", esc_url( $og_image ) );
     printf( '<meta property="og:url" content="%s" />' . "\n", esc_url( $og_url ) );
     printf( '<meta property="og:type" content="%s" />' . "\n", is_singular() && ! is_front_page() ? 'article' : 'website' );
     printf( '<meta property="og:site_name" content="%s" />' . "\n", esc_attr( $vars['sitename'] ) );
+    printf( '<meta property="og:locale" content="%s" />' . "\n", esc_attr( $og_locale ) );
+
+    // Twitter Card.
+    printf( '<meta name="twitter:card" content="%s" />' . "\n", $og_image ? 'summary_large_image' : 'summary' );
+    if ( $og_title ) printf( '<meta name="twitter:title" content="%s" />' . "\n", esc_attr( $og_title ) );
+    if ( $og_desc )  printf( '<meta name="twitter:description" content="%s" />' . "\n", esc_attr( $og_desc ) );
+    if ( $og_image ) printf( '<meta name="twitter:image" content="%s" />' . "\n", esc_url( $og_image ) );
 }, 1 );
 
 /**
