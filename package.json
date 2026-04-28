@@ -1,6 +1,6 @@
 {
   "name": "snel-seo",
-  "version": "1.16.11",
+  "version": "1.16.12",
   "description": "Lightweight SEO toolkit by Snelstack",
   "private": true,
   "scripts": {

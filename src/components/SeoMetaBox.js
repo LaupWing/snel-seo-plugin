@@ -137,9 +137,8 @@ export default function SeoMetaBox() {
             : [ { code: activeLang, label: activeLang.toUpperCase() } ];
 
         for ( const lang of otherLangs ) {
-            const hasTitle = !! seoTitle[ defaultLang ] || !! seoTitle[ lang.code ];
-            const needsTitle = hasTitle || !! postTitle;
-            const needsDesc = !! metaDesc[ defaultLang ] || !! metaDesc[ lang.code ] || !! postTitle;
+            const needsTitle = !! seoTitle[ defaultLang ];
+            const needsDesc  = !! metaDesc[ defaultLang ];
             const needsKw = !! focusKw[ defaultLang ];
 
             await animateBtnText( `✦ Translating ${ lang.label }...` );
@@ -222,7 +221,7 @@ export default function SeoMetaBox() {
 
     // Count how many languages are missing content
     const missingCount = languages.filter( ( l ) =>
-        l.code !== defaultLang && ( ! seoTitle[ l.code ] || ! metaDesc[ l.code ] || ( focusKw[ defaultLang ] && ! focusKw[ l.code ] ) )
+        l.code !== defaultLang && ( ! metaDesc[ l.code ] || ( focusKw[ defaultLang ] && ! focusKw[ l.code ] ) )
     ).length;
 
     // Resolve preview
@@ -275,13 +274,10 @@ export default function SeoMetaBox() {
                                     { lang.default && (
                                         <span className="ml-0.5 text-[10px]">({ __( 'default', 'snel-seo' ) })</span>
                                     ) }
-                                    { ! lang.default && ( seoTitle[ lang.code ] && metaDesc[ lang.code ] ) && (
+                                    { ! lang.default && metaDesc[ lang.code ] && (
                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full" />
                                     ) }
-                                    { ! lang.default && ( ! seoTitle[ lang.code ] || ! metaDesc[ lang.code ] ) && ( seoTitle[ lang.code ] || metaDesc[ lang.code ] ) && (
-                                        <span className="ml-1 inline-block w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                                    ) }
-                                    { ! lang.default && ! seoTitle[ lang.code ] && ! metaDesc[ lang.code ] && (
+                                    { ! lang.default && ! metaDesc[ lang.code ] && (
                                         <span className="ml-1 inline-block w-1.5 h-1.5 bg-gray-300 rounded-full" />
                                     ) }
                                 </button>
