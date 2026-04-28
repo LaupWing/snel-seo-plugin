@@ -191,7 +191,12 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     if ( is_singular( 'post' ) ) {
         $template = snel_seo_get_ml_setting( $settings, 'title-post' );
         if ( $template ) {
-            if ( ! $has_custom_title ) $vars['title'] = get_the_title();
+            if ( ! $has_custom_title ) {
+                $lang             = snel_seo_get_current_lang();
+                $default          = snel_seo_get_default_lang();
+                $translated_title = $lang !== $default ? get_post_meta( $post_id, '_title_' . $lang, true ) : '';
+                $vars['title']    = $translated_title ?: get_the_title();
+            }
             return snel_seo_resolve_template( $template, $vars );
         }
     }
@@ -199,7 +204,12 @@ add_filter( 'pre_get_document_title', function ( $title ) {
     if ( is_page() ) {
         $template = snel_seo_get_ml_setting( $settings, 'title-page' );
         if ( $template ) {
-            if ( ! $has_custom_title ) $vars['title'] = get_the_title();
+            if ( ! $has_custom_title ) {
+                $lang             = snel_seo_get_current_lang();
+                $default          = snel_seo_get_default_lang();
+                $translated_title = $lang !== $default ? get_post_meta( $post_id, '_title_' . $lang, true ) : '';
+                $vars['title']    = $translated_title ?: get_the_title();
+            }
             return snel_seo_resolve_template( $template, $vars );
         }
     }
