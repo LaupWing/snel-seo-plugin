@@ -406,7 +406,24 @@ add_action( 'wp_head', function () {
         if ( is_front_page() || is_home() ) {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-home-wpseo' );
         } elseif ( is_singular( 'post' ) ) {
-            $description = snel_seo_get_ml_setting( $settings, 'metadesc-post' );
+            // Try excerpt first, then content — only use template as last resort.
+            $excerpt = get_the_excerpt( get_queried_object_id() );
+            if ( $excerpt && $excerpt !== __( 'No excerpt', 'default' ) ) {
+                $description = wp_trim_words( wp_strip_all_tags( $excerpt ), 25, '…' );
+            }
+            if ( ! $description ) {
+                $post_obj = get_post( get_queried_object_id() );
+                if ( $post_obj && ! empty( $post_obj->post_content ) ) {
+                    $text = wp_strip_all_tags( strip_shortcodes( $post_obj->post_content ) );
+                    $text = preg_replace( '/\s+/', ' ', trim( $text ) );
+                    if ( strlen( $text ) > 10 ) {
+                        $description = mb_substr( $text, 0, 155 ) . '…';
+                    }
+                }
+            }
+            if ( ! $description ) {
+                $description = snel_seo_get_ml_setting( $settings, 'metadesc-post' );
+            }
         } elseif ( is_page() ) {
             $description = snel_seo_get_ml_setting( $settings, 'metadesc-page' );
         } elseif ( is_tax() || is_category() || is_tag() ) {
