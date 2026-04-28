@@ -244,9 +244,7 @@ function snel_seo_classic_metabox_render( $post ) {
                     $has_desc  = ! empty( $seo_descs[ $code ] );
                     $dot_class = '';
                     if ( ! $lang['default'] ) {
-                        if ( $has_title && $has_desc ) $dot_class = 'snel-seo-dot-green';
-                        elseif ( $has_title || $has_desc ) $dot_class = 'snel-seo-dot-amber';
-                        else $dot_class = 'snel-seo-dot-gray';
+                        $dot_class = $has_desc ? 'snel-seo-dot-green' : 'snel-seo-dot-gray';
                     }
                 ?>
                     <button type="button"
@@ -489,13 +487,7 @@ function snel_seo_classic_metabox_render( $post ) {
                 }
 
                 dot.className = 'snel-seo-dot';
-                if (hasTitle && hasDesc) {
-                    dot.classList.add('snel-seo-dot-green');
-                } else if (hasTitle || hasDesc) {
-                    dot.classList.add('snel-seo-dot-amber');
-                } else {
-                    dot.classList.add('snel-seo-dot-gray');
-                }
+                dot.classList.add( hasDesc ? 'snel-seo-dot-green' : 'snel-seo-dot-gray' );
             });
         }
 
@@ -512,11 +504,10 @@ function snel_seo_classic_metabox_render( $post ) {
                 var srcTitle = defaultTitle ? defaultTitle.value.trim() : '';
                 var srcDesc = defaultDesc ? defaultDesc.value.trim() : '';
 
-                if (!srcTitle && !srcDesc && !postTitle) {
+                if (!srcTitle && !srcDesc) {
                     translateStatus.textContent = 'Fill in the default language first.';
                     return;
                 }
-                if (!srcTitle) srcTitle = postTitle;
 
                 translateBtn.disabled = true;
                 var otherLangs = currentLang === defaultLang
