@@ -617,10 +617,10 @@ export default function Settings() {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                            <label className="block text-sm font-medium text-gray-700 mb-0.5">
                                 { __( 'Default Social Image', 'snel-seo' ) }
                             </label>
-                            <p className="text-xs text-gray-400 mb-2">
+                            <p className="text-[11px] text-gray-400 mb-1.5">
                                 { __( 'Used when a page has no featured image. Recommended: 1200x630px.', 'snel-seo' ) }
                             </p>
                             { settings.default_og_image ? (

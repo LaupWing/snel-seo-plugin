@@ -334,6 +334,8 @@ export default function Redirects() {
 
     const [ importing, setImporting ] = useState( false );
     const [ importResult, setImportResult ] = useState( null );
+    const [ showImportModal, setShowImportModal ] = useState( false );
+    const [ importOverride, setImportOverride ] = useState( false );
     const [ searchQuery, setSearchQuery ] = useState( '' );
     const [ currentPage, setCurrentPage ] = useState( 1 );
     const perPage = 20;
@@ -361,10 +363,12 @@ export default function Redirects() {
         if ( ! file ) return;
         setImporting( true );
         setImportResult( null );
+        setShowImportModal( false );
         try {
             const text = await file.text();
             const data = JSON.parse( text );
-            const res = await fetch( `${ window.snelSeo.restUrl }/redirects/import`, {
+            const url = `${ window.snelSeo.restUrl }/redirects/import${ importOverride ? '?override=true' : '' }`;
+            const res = await fetch( url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': window.snelSeo.nonce },
                 body: JSON.stringify( data ),
@@ -514,11 +518,14 @@ export default function Redirects() {
                             <FlaskConical size={ 14 } />
                             { __( 'Test Redirects', 'snel-seo' ) }
                         </button>
-                        <label className={ `flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer ${ importing ? 'opacity-50 pointer-events-none' : '' }` }>
+                        <button
+                            onClick={ () => { setShowImportModal( true ); setImportOverride( false ); } }
+                            disabled={ importing }
+                            className={ `flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors ${ importing ? 'opacity-50 pointer-events-none' : '' }` }
+                        >
                             { importing ? <Loader2 size={ 14 } className="animate-spin" /> : <Upload size={ 14 } /> }
                             { importing ? __( 'Importing...', 'snel-seo' ) : __( 'Import JSON', 'snel-seo' ) }
-                            <input type="file" accept=".json" onChange={ handleImport } className="hidden" />
-                        </label>
+                        </button>
                         <button
                             onClick={ () => openAdd() }
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -567,7 +574,7 @@ export default function Redirects() {
                         <div className={ `mb-4 px-4 py-3 rounded-lg text-sm ${ importResult.error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700' }` }>
                             { importResult.error
                                 ? `Import failed: ${ importResult.error }`
-                                : `Imported ${ importResult.imported } redirects (${ importResult.skipped } skipped, ${ importResult.total } total in file)`
+                                : `Imported ${ importResult.imported } new${ importResult.updated ? `, ${ importResult.updated } updated` : '' } — ${ importResult.skipped } skipped (${ importResult.total } total)`
                             }
                             <button onClick={ () => setImportResult( null ) } className="ml-2 underline">dismiss</button>
                         </div>
@@ -788,6 +795,49 @@ export default function Redirects() {
                                 { saving && <Loader2 size={ 14 } className="animate-spin" /> }
                                 { editingId ? __( 'Save Changes', 'snel-seo' ) : __( 'Add Redirect', 'snel-seo' ) }
                             </button>
+                        </div>
+                    </div>
+                </Modal>
+            ) }
+
+            {/* Import JSON Modal */}
+            { showImportModal && (
+                <Modal
+                    title={ __( 'Import Redirects', 'snel-seo' ) }
+                    onRequestClose={ () => setShowImportModal( false ) }
+                >
+                    <div className="space-y-4">
+                        <p className="text-sm text-gray-500">
+                            { __( 'Select a JSON file containing an array of redirect mappings with', 'snel-seo' ) }{ ' ' }
+                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">old_url</code>{ ' ' }
+                            { __( 'and', 'snel-seo' ) }{ ' ' }
+                            <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">new_url</code>{ ' ' }
+                            { __( 'keys.', 'snel-seo' ) }
+                        </p>
+                        <label className="flex items-start gap-3 p-3 rounded-lg border border-amber-200 bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={ importOverride }
+                                onChange={ ( e ) => setImportOverride( e.target.checked ) }
+                                className="mt-0.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            <div>
+                                <span className="text-sm font-medium text-amber-900">{ __( 'Override existing redirects', 'snel-seo' ) }</span>
+                                <p className="text-xs text-amber-700 mt-0.5">{ __( 'If a source URL already exists, update its target instead of skipping it.', 'snel-seo' ) }</p>
+                            </div>
+                        </label>
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                                onClick={ () => setShowImportModal( false ) }
+                                className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                            >
+                                { __( 'Cancel', 'snel-seo' ) }
+                            </button>
+                            <label className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors cursor-pointer">
+                                <Upload size={ 14 } />
+                                { __( 'Choose File', 'snel-seo' ) }
+                                <input type="file" accept=".json" onChange={ handleImport } className="hidden" />
+                            </label>
                         </div>
                     </div>
                 </Modal>

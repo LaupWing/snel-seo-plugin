@@ -250,12 +250,14 @@ add_action( 'rest_api_init', function () {
             global $wpdb;
             $table    = SnelSeoConfig::table( SnelSeoConfig::$table_redirects );
             $mappings = $request->get_json_params();
+            $override = (bool) $request->get_param( 'override' );
 
             if ( ! is_array( $mappings ) ) {
                 return new WP_Error( 'invalid_format', 'Expected a JSON array.', array( 'status' => 400 ) );
             }
 
             $imported = 0;
+            $updated  = 0;
             $skipped  = 0;
 
             foreach ( $mappings as $item ) {
@@ -277,8 +279,18 @@ add_action( 'rest_api_init', function () {
                     "SELECT id FROM $table WHERE source_url = %s LIMIT 1",
                     $source
                 ) );
+
                 if ( $exists ) {
-                    $skipped++;
+                    if ( $override ) {
+                        $wpdb->update(
+                            $table,
+                            array( 'target_url' => $target, 'is_pattern' => $is_pattern ),
+                            array( 'id' => $exists )
+                        );
+                        $updated++;
+                    } else {
+                        $skipped++;
+                    }
                     continue;
                 }
 
@@ -294,6 +306,7 @@ add_action( 'rest_api_init', function () {
             return rest_ensure_response( array(
                 'success'  => true,
                 'imported' => $imported,
+                'updated'  => $updated,
                 'skipped'  => $skipped,
                 'total'    => count( $mappings ),
             ) );
