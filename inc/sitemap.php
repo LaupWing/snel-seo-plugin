@@ -139,17 +139,36 @@ function snel_seo_render_sitemap( $type, $settings ) {
 
     $ids = get_posts( $args );
 
+    // Detect non-default languages from the theme's LocaleManager.
+    $extra_langs = array();
+    if ( class_exists( 'LocaleManager' ) ) {
+        $default = LocaleManager::default();
+        foreach ( LocaleManager::supported() as $lang ) {
+            if ( $lang !== $default ) {
+                $extra_langs[] = $lang;
+            }
+        }
+    }
+
     $xml  = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
 
     foreach ( $ids as $post_id ) {
         $url      = get_permalink( $post_id );
         $modified = get_post_modified_time( 'Y-m-d\TH:i:sP', true, $post_id );
+        $path     = wp_parse_url( $url, PHP_URL_PATH );
 
         $xml .= "  <url>\n";
         $xml .= '    <loc>' . esc_url( $url ) . "</loc>\n";
         $xml .= '    <lastmod>' . esc_html( $modified ) . "</lastmod>\n";
         $xml .= "  </url>\n";
+
+        foreach ( $extra_langs as $lang ) {
+            $xml .= "  <url>\n";
+            $xml .= '    <loc>' . esc_url( home_url( '/' . $lang . $path ) ) . "</loc>\n";
+            $xml .= '    <lastmod>' . esc_html( $modified ) . "</lastmod>\n";
+            $xml .= "  </url>\n";
+        }
     }
 
     $xml .= '</urlset>';
