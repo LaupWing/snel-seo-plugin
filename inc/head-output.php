@@ -8,6 +8,21 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
+ * Filter <html lang="..."> to match the current visitor language.
+ *
+ * Without this, WordPress always outputs the site's default WP locale
+ * (set in Settings → General), even when the visitor is viewing /en/.
+ *
+ * The theme's `snel_seo_languages` filter must include a `locale` field
+ * (e.g. 'nl_NL') for each language entry. Falls back to the language code.
+ */
+add_filter( 'language_attributes', function ( $output ) {
+    $locale    = snel_seo_get_current_locale();
+    $html_lang = str_replace( '_', '-', $locale );
+    return preg_replace( '/lang="[^"]*"/', 'lang="' . esc_attr( $html_lang ) . '"', $output );
+} );
+
+/**
  * Get the separator character.
  */
 function snel_seo_get_separator() {

@@ -5,14 +5,14 @@
 | File | What it does |
 |------|-------------|
 | `admin.php` | Admin menu registration, React app enqueue, settings save/load REST endpoints, `snel_seo_get_custom_post_types_with_meta()` for field detection |
-| `head-output.php` | All frontend `<head>` output: title filter, meta description, OG tags, canonical URL, JSON-LD (Organization, BreadcrumbList, dynamic per-CPT schema) |
+| `head-output.php` | All frontend `<head>` output: title filter, meta description, OG tags, canonical URL, JSON-LD (Organization, BreadcrumbList, dynamic per-CPT schema), `<html lang="...">` filter (multilingual-aware) |
 | `meta-box.php` | Registers SEO metabox on all public post types. Auto-detects Gutenberg vs classic editor per post. |
 | `classic-metabox/` | PHP-rendered metabox for non-Gutenberg post types. Has its own fallback title/description pre-fill logic. |
 | `rest-api.php` | AI-powered endpoints: analyze keyphrase, suggest keyphrases, generate title/desc/keyphrase, render post content |
 | `redirects.php` | Redirect manager + 404 logging. Custom DB tables, REST CRUD, template_redirect hook for frontend redirects |
 | `sitemap.php` | Custom XML sitemap at `/sitemap.xml`. Configurable post types, exclusion list. |
 | `robots.php` | robots.txt filter override + REST endpoint for editing |
-| `languages.php` | Helpers: `snel_seo_get_languages()`, `snel_seo_get_current_lang()`, `snel_seo_get_default_lang()`, `snel_seo_is_multilingual()` |
+| `languages.php` | Helpers: `snel_seo_get_languages()`, `snel_seo_get_current_lang()`, `snel_seo_get_default_lang()`, `snel_seo_get_current_locale()`, `snel_seo_is_multilingual()` |
 
 ## Key Helper Functions
 
@@ -62,3 +62,14 @@ All under namespace `snel-seo/v1`. Require `manage_options` for admin endpoints,
 - New REST endpoint: add to the relevant `rest_api_init` hook in the responsible file
 - New head output: add to the `wp_head` action in `head-output.php`
 - New post meta: register in `meta-box.php` init hook
+
+## Theme/Plugin Filter Contract
+
+Themes integrate by hooking these filters:
+
+| Filter | Returns | Notes |
+|---|---|---|
+| `snel_seo_languages` | Array of `['code', 'label', 'default', 'locale']` | **Must include `locale`** (e.g. `'nl_NL'`) for `<html lang>` to work |
+| `snel_seo_current_language` | Current language code (e.g. `'nl'`) | Plugin reads this for canonical, title, lang attribute |
+
+`<html lang="...">` is set by the plugin (filter on `language_attributes` in `head-output.php`). It reads `snel_seo_get_current_locale()` which looks up the `locale` field. **Themes must NOT add their own `language_attributes` filter** — that would conflict. If a theme's `snel_seo_languages` filter omits `locale`, the plugin falls back to the language code (`lang="nl"` instead of `lang="nl-NL"`) — still better than the WP default but suboptimal.

@@ -30,3 +30,22 @@ function snel_seo_get_current_lang() {
 function snel_seo_is_multilingual() {
     return count( snel_seo_get_languages() ) > 1;
 }
+
+/**
+ * Get the locale string for the current visitor language.
+ *
+ * Looks up the `locale` field on the current language entry from
+ * `snel_seo_get_languages()`. Falls back to the language code if
+ * the theme doesn't provide a locale.
+ *
+ * Used by the language_attributes filter to set <html lang="...">.
+ */
+function snel_seo_get_current_locale() {
+    $current = snel_seo_get_current_lang();
+    foreach ( snel_seo_get_languages() as $lang ) {
+        if ( ( $lang['code'] ?? '' ) === $current ) {
+            return $lang['locale'] ?? $current;
+        }
+    }
+    return $current;
+}
